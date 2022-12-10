@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<title>Thin Analyser</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+	<link href="css/bootstrap.css" rel="stylesheet" type="text/css" />
+	<link href="css/fontawesome.css" rel="stylesheet" type="text/css" />
+	<link href="css/style.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+	<div id="main-view" class="container-fluid position-relative">
+		<div class="row">
+			<div id="title-bar" class="col-12 bg-dark text-light shadow">
+				<div class="row align-items-center h-100">
+					<div class="col">
+						<div class="btn btn-sm text-light">
+							<i class="fa fa-folder-open" onclick="document.getElementById('obj_loader').click();"
+								title="Upload objects"></i>
+						</div>
+						<div class="btn btn-sm text-light">
+							<a id="obj_download" download="objects.json">
+								<i class="fa fa-save" onclick="saveObj();" title="Save objects"></i>
+							</a>
+						</div>
+					</div>
+					<div class="col text-center">Thin Analyser</div>
+					<div class="col text-end">
+						<div id="info-btn" class="btn btn-sm text-light">
+							<i class="fa fa-question"></i>
+						</div>
+						<div id="close-btn" class="btn btn-sm text-light">
+							<i class="fa fa-times"></i>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="left-panel" class="col bg-light shadow">
+				<input style="display: none;" type="file" accept=".json" id="obj_loader" />
+				<input style="display: none;" type="file" accept=".geojson" id="points_loader" />
+				<div id="navigation" class="row bg-blur position-sticky align-items-center g-2 py-3">
+					<div class="col-12">
+						<div class="h5">Object <span id="obj_selected">1</span> of <span id="obj_max">1</span></div>
+					</div>
+					<div class="col">
+						<input id="obj_name" class="form-control" value="Nameless" type="text" />
+					</div>
+					<div class="col-auto">
+						<span class="btn btn-sm" onclick="prevObjBtn()"><i class="fa fa-chevron-left" style="opacity: 0.5;" id="prev_obj"></i></span>
+						<span class="btn btn-sm" onclick="nextObjBtn()"><i class="fa fa-chevron-right" style="opacity: 0.5;" id="next_obj"></i></span>
+						<span class="btn btn-sm" onclick="addObjBtn();"><i class="fa fa-plus" id="add_obj"></i></span>
+						<span class="btn btn-sm" onclick="deleteObjBtn();"><i class="fa fa-trash-alt" id="remove_obj" style="opacity: 0.5;"></i></span>
+					</div>
+				</div>
+				<div id="parameters" class="mt-2">
+					<div class="card mb-3 p-3">
+						<div class="h5 mb-3">COLORS</div>
+						<div class="colors">
+							<input id="max_colors" type="hidden" name="max_colors" value="1" />
+							<div class="color" data-number="1">
+								<div class="number mb-2">COLOR 1</div>
+								<div class="mb-3">
+									<label class="form-label">Color & Max Delta E of PPL valid pixel</label>
+									<div class="row align-items-center ppl">
+										<div class="col-auto"><input style="width: 37px;"
+												class="form-control form-control-color" id="ppl_color_target_1"
+												type="color" value="#FFFFFF"></div>
+										<div class="col-auto p-0">
+											<span class="btn btn-sm" onclick="openPicker(1,this);"><i
+												class="fa fa-eye-dropper"></i></span></div>
+										<div class="col"><input id="ppl_tollerance_1" class="form-control"
+												type="number" min="0" max="100" value="15"></div>
+									</div>
+								</div>
+								<div class="mb-3">
+									<label class="form-label">Color & Max Delta E of XPL valid pixel</label>
+									<div class="row align-items-center xpl">
+										<div class="col-auto"><input style="width: 37px;"
+												class="form-control form-control-color" id="xpl_color_target_1"
+												type="color" value="#000000"></div>
+											<div class="col-auto p-0"><span class="btn btn-sm" onclick="openPicker(2,this);"><i
+												class="fa fa-eye-dropper"></i></span></div>
+											<div class="col"><input id="xpl_tollerance_1" class="form-control"
+												type="number" min="0" max="100" value="15"></div>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div class="row g-2">
+							<div class="col">
+								<div class="btn btn-sm btn-primary d-block" onclick="addColorBtn();" id="add_color">Add</div>
+							</div>
+							<div class="col">
+								<div class="btn btn-sm btn-danger d-block" onclick="removeColorBtn();" id="remove_color">Remove</div>
+							</div>
+						</div>
+					</div>
+					<div class="card mb-3 p-3">
+						<div class="h5 mb-3">PROPERTIES</div>
+						<div class="mb-3">
+							<label class="form-label">Net Area</label>
+							<div class="row g-1">
+								<div class="col-auto d-flex align-items-center">Min</div>
+								<div class="col"><input id="min_area" class="form-control" type="number" value="10" min="1" /></div>
+								<div class="col-auto d-flex align-items-center">Max</div>
+								<div class="col"><input id="max_area" class="form-control" type="number" value="100000" /></div>
+							</div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label">Compactness Ratio</label>
+							<div class="row g-1">
+								<div class="col-auto d-flex align-items-center">Min</div>
+								<div class="col"><input id="min_compactness" class="form-control" type="number"
+										value="0" min="0" step="0.01" max="1" /></div>
+								<div class="col-auto d-flex align-items-center">Max</div>
+								<div class="col"><input id="max_compactness" class="form-control" type="number" value="1" min="0" step="0.01" max="1" /></div>
+							</div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label">Convexity Ratio</label>
+							<div class="row g-1">
+								<div class="col-auto d-flex align-items-center">Min</div>
+								<div class="col"><input id="min_convexity" class="form-control" type="number" value="0" min="0" step="0.01" max="1" /></div>
+								<div class="col-auto d-flex align-items-center">Max</div>
+								<div class="col"><input id="max_convexity" class="form-control" type="number" value="1" min="0" step="0.01" max="1" /></div>
+							</div>
+						</div>
+						<div class="mb-3">
+							<label class="form-label">Aspect Ratio</label>
+							<div class="row g-1">
+								<div class="col-auto d-flex align-items-center">Min</div>
+								<div class="col"><input id="min_aspect_ratio" class="form-control" type="number" value="0" min="0" step="0.01" max="1" /></div>
+								<div class="col-auto d-flex align-items-center">Max</div>
+								<div class="col"><input id="max_aspect_ratio" class="form-control" type="number" value="1" min="0" step="0.01" max="1" /></div>
+							</div>
+						</div>
+						<div>
+							<label class="form-label">Major Axis Angle</label>
+							<div class="row g-1">
+								<div class="col-auto d-flex align-items-center">Min</div>
+								<div class="col"><input id="min_major_axis_angle" class="form-control" type="number" value="-90" min="-90" step="0.01" max="90" /></div>
+								<div class="col-auto d-flex align-items-center">Max</div>
+								<div class="col"><input id="max_major_axis_angle" class="form-control" type="number" value="90" min="-90" step="0.01" max="90" /></div>
+							</div>
+						</div>
+					</div>
+					<div class="card p-3">
+						<div class="h5">RENDER</div>
+						<div class="mb-3">
+							<label class="form-label">Col. of valid pixel & mode</label>
+							<div class="row g-2">
+								<div class="col-auto">
+									<input class="form-control form-control-color" id="render_color" style="width: 37px;" type="color" name="favcolor" value="#ff00b6" />
+								</div>
+								<div class="col">
+									<select id="render_mode" class="form-select">
+										<option value="fill" selected>Fill</option>
+										<option value="only_border">Only border</option>
+									</select>
+								</div>
+							</div>
+							<!--<div><input style="margin-right: 7.5px;" name="render_cumulative" id="render_cumulative" type="checkbox" /><label for="render_cumulative">Cumulative render</label></div>-->
+						</div>
+						<div id="render_segment_color_container" style="display: none;">
+							<label class="form-label">Col. of valid segment</label>
+								<input class="form-control form-control-color" id="render_segment_color" style="width: 37px;" type="color" value="#ff0000" />
+						</div>
+					</div>
+					<div id="action-buttons" class="text-end row g-2 my-3">
+						<div class="col">
+							<div class="btn btn-secondary w-100" onclick="crop();"><i class="fa fa-cut"></i></div>
+						</div>
+						<div class="col">
+							<div class="btn btn-secondary w-100"  onclick="document.getElementById('points_loader').click();"><i class="fas fa-file-import"></i></div>
+						</div>
+						<div class="col">
+							<div class="dropdown d-inline-block">
+								<div class="btn btn-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown"><i class="fa fa-download"></i></div>
+								<ul class="dropdown-menu dropdown-menu-start">
+									<li><a id="ppl_download" download="ppl_results.png" class="dropdown-item" onclick="pplDownload()"
+											href="javascript:">Download
+											PPL</a></li>
+									<li><a id="xpl_download" download="xpl_results.png" class="dropdown-item" onclick="xplDownload()"
+											href="javascript:">Download
+											XPL</a></li>
+									<li><a id="csv_download" download="points.csv" class="dropdown-item" onclick="csvDownload()"
+											href="javascript:">Download
+											CSV</a></li>
+									<li><a id="geojson_download" download="points.json" class="dropdown-item" onclick="geojsonDownload()"
+											href="javascript:">Download
+											GeoJson</a></li>
+								</ul>
+							</div>
+						</div>
+						<div class="col">
+							<span class="btn btn-primary w-100" onclick="start();"><i class="fa fa-play"></i></span>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="preview" class="col position-relative">
+				<div class="row h-100">
+					<div class="col-md-6 h-100">
+						<div class="h-50 p-3 text-center">
+							<input style="display: none;" type="file" accept=".jpg,.jpeg,.png" id="ppl_loader" />
+							<div id="ppl_upload_icon">
+								<div><i class="fas fa-upload"
+										onclick="document.getElementById('ppl_loader').click();"></i></div>
+								<div>PPL</div>
+							</div>
+							<div id="ppl_preview" style="display: none; height: 100%; max-width: 100%; cursor: pointer;"
+								onclick="document.getElementById('ppl_loader').click();"><canvas style="max-height: 100%; max-width: 100%; vertical-align: middle;" id="ppl_preview_canvas"></canvas></div>
+						</div>
+						<div class="h-50 p-3 text-center">
+							<input style="display: none;" type="file" accept=".jpg,.jpeg,.png" id="xpl_loader" />
+							<div id="xpl_upload_icon">
+								<div><i class="fas fa-upload" onclick="document.getElementById('xpl_loader').click();"></i></div>
+								<div>XPL</div>
+							</div>
+							<div id="xpl_preview" style="display: none; height: 100%; max-width: 100%; cursor: pointer;"
+								onclick="document.getElementById('xpl_loader').click();"><canvas style="max-height: 100%; max-width: 100%; vertical-align: middle;" id="xpl_preview_canvas"></canvas></div>
+						</div>
+					</div>
+					<div class="col-md-6 h-100">
+						<div id="canvas1_div" class="p-3 h-100 text-center mw-100 pointer" onclick="changeCanvas('xpl');">
+							<canvas id="ppl_results_canvas" class="mw-100 mh-100"></canvas>
+						</div>
+						<div id="canvas2_div" class="p-3 h-100 text-center mw-100 pointer" onclick="changeCanvas('ppl');"
+							style="display: none;">
+							<canvas id="xpl_results_canvas" class="mw-100 mh-100"></canvas>
+						</div>
+						<div style="display: none;">
+							<canvas id="ppl_cropped_canvas"></canvas>
+							<canvas id="xpl_cropped_canvas"></canvas>
+						</div>
+					</div>
+				</div>
+				
+				<div class="btn position-absolute" style="bottom: 1rem; right: 1rem;" onclick="$('#bottom-panel').show(0)"><i class="fa fa-chevron-up"></i></div>
+				<div id="bottom-panel" class="position-absolute w-100 bg-blur p-3">
+					<div class="row align-items-center mb-2">
+						<div class="col-auto">
+							<div style="font-size: 22px; line-height: 44px;"><span id="obj_current" style="font-size: 36px;">1</span> of
+								<span id="obj_max_2" style="font-size: 36px;">1</span>
+							</div>
+						</div>
+						<div class="col">
+							<div id="status" style="font-size: 32px; line-height: 44px;">Ready.</div>
+						</div>
+						<div class="col-auto">
+							<div class="btn btn-sm" onclick="$('#bottom-panel').hide(0)"><i class="fa fa-chevron-down"></i></div>
+						</div>
+					</div>
+					<div id="progress-bar" class="rounded bg-primary"></div>
+					<div id="log" class="rounded bg-dark mt-3"></div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="picker-view">
+		<canvas id="picker-canvas" onclick="get_segment(event);"></canvas>
+	</div>
+
+	<div class="loading" id="loading">Loading&#8230;</div>
+
+	<div class="p-3 d-none">
+		<div style="font-size: 18px;">Thin Analyser v. 1.0</div>
+		<div>&copy; 2020-2022, <a href="mailto:gianluca.chiarani@gmail.com"></a>Gianluca Chiarani</a>. GNU General Public License (GPL)</div>
+	</div>
+
+	<script type="text/javascript" src="js/jquery.js"></script>
+	<script type="text/javascript" src="js/bootstrap.js"></script>
+	<script type="text/javascript" src="js/core.js"></script>
+</body>
+
+</html>
