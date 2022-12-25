@@ -103,7 +103,7 @@
 							<label class="form-label">Net Area</label>
 							<div class="row g-1">
 								<div class="col-auto d-flex align-items-center">Min</div>
-								<div class="col"><input id="min_area" class="form-control" type="number" value="10" min="1" /></div>
+								<div class="col"><input id="min_area" class="form-control" type="number" value="5" min="1" /></div>
 								<div class="col-auto d-flex align-items-center">Max</div>
 								<div class="col"><input id="max_area" class="form-control" type="number" value="100000" /></div>
 							</div>
@@ -195,7 +195,7 @@
 							</div>
 						</div>
 						<div class="col">
-							<span class="btn btn-primary w-100" onclick="start();"><i class="fa fa-play"></i></span>
+							<button id="start_btn" class="btn btn-primary w-100" onclick="start();"><i class="fa fa-play"></i></button>
 						</div>
 					</div>
 				</div>
@@ -261,7 +261,7 @@
 	</div>
 
 	<div id="picker-view">
-		<canvas id="picker-canvas" onclick="get_segment(event);"></canvas>
+		<canvas id="picker-canvas" onclick="getSegment(event);"></canvas>
 	</div>
 
 	<div class="loading" id="loading">Loading&#8230;</div>

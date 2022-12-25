@@ -48,6 +48,17 @@ html, body {
 	overflow: auto;
 	margin-bottom: 1.5rem;
 }
+#cropper-view {
+	display: none;
+	width: 100%;
+	max-width: 100%;
+	height: 100vh;
+}
+#cropper-view .btn {
+	position: fixed;
+	bottom: 1rem;
+	right: 1rem;
+}
 .colors .color + .color {
 	margin-top: 1.5rem;
 }

@@ -6,42 +6,43 @@
 
 "use strict";
 
-var ppl_preview_canvas = $('#ppl_preview_canvas');
-var xpl_preview_canvas = $('#xpl_preview_canvas');
+var ppl_preview_canvas = document.getElementById('ppl_preview_canvas');
+var xpl_preview_canvas = document.getElementById('xpl_preview_canvas');
 
-var pplCroppedCanvas = $('#ppl_cropped_canvas');
-var xplCroppedCanvas = $('#xpl_cropped_canvas');
+var pplCroppedCanvas = document.getElementById('ppl_cropped_canvas');
+var xplCroppedCanvas = document.getElementById('xpl_cropped_canvas');
 
-var ppl_results_canvas = $('#ppl_results_canvas');
-var xpl_results_canvas = $('#xpl_results_canvas');
+var ppl_results_canvas = document.getElementById('ppl_results_canvas');
+var xpl_results_canvas = document.getElementById('xpl_results_canvas');
 
-var picker_canvas = $('#picker-canvas');
+var pickerCanvas = document.getElementById('picker-canvas');
 
-var ppl_preview_ctx = ppl_preview_canvas[0].getContext('2d', { willReadFrequently: true});
-var xpl_preview_ctx = xpl_preview_canvas[0].getContext('2d', { willReadFrequently: true });
+var ppl_preview_ctx = ppl_preview_canvas.getContext('2d', { willReadFrequently: true});
+var xpl_preview_ctx = xpl_preview_canvas.getContext('2d', { willReadFrequently: true });
 
-var ppl_cropped_ctx = pplCroppedCanvas[0].getContext('2d', { willReadFrequently: true });
-var xpl_cropped_ctx = xplCroppedCanvas[0].getContext('2d', { willReadFrequently: true });
+var ppl_cropped_ctx = pplCroppedCanvas.getContext('2d', { willReadFrequently: true });
+var xpl_cropped_ctx = xplCroppedCanvas.getContext('2d', { willReadFrequently: true });
 
-var ppl_results_ctx = ppl_results_canvas[0].getContext("2d", { willReadFrequently: true });
-var xpl_results_ctx = xpl_results_canvas[0].getContext("2d", { willReadFrequently: true });
+var ppl_results_ctx = ppl_results_canvas.getContext("2d", { willReadFrequently: true });
+var xpl_results_ctx = xpl_results_canvas.getContext("2d", { willReadFrequently: true });
 
-var picker_canvas_ctx = picker_canvas[0].getContext("2d", { willReadFrequently: true });
+var pickerCanvasCtx = pickerCanvas.getContext("2d", { willReadFrequently: true });
 
 var ppl, xpl;
-var ppl_uploaded = false;
+var pplUploaded = false;
 
-var perc_add;
+var percAdd;
 
-var totalPixels, segment_perimeter, segment_color, segment_points;
+var totalPixels, segmentPerimeterPixels, segmentAreaPixels;
 
 var segments = [];
 var validPixels = []
 var filtered = [];
 var filteredExport = [];
 var stats = [];
+var labColors = {};
 
-var imgDataPpl, imgDataXpl, imgDataPpl_original, imgDataXpl_original, imgDataMask, imgDataMaskB;
+var imgDataPpl, imgDataXpl, imgDataMask, imgDataMaskB, imgDataMaskAll;
 var status;
 
 var margin = {
@@ -56,9 +57,11 @@ var objects = [];
 var maxObjects = 1;
 var selectedObject = 1;
 
-var picker_color_n = 1;
-var first_render = 0;
-var lab_colors = {};
+var cropper = false;
+var pickerColorN = 1;
+
+var firstRender = 0; 
+var onlySelected = false;
 
 var comparisonPoints = [], comparisonValidPoints = [];
 
@@ -67,16 +70,18 @@ $('#xpl_loader').on('change', xplHandleImage);
 $('#obj_loader').on('change', loadObj);
 $('#points_loader').on('change', importPoints);
 
-function pplHandleImage(e) {
+var autoload = 'test/';
+if (autoload) {
 	ppl = new Image();
+	xpl = new Image();
 
 	ppl.onload = function () {
-		ppl_preview_canvas[0].width = ppl.width;
-		ppl_preview_canvas[0].height = ppl.height;
-		pplCroppedCanvas[0].width = ppl.width;
-		pplCroppedCanvas[0].height = ppl.height;
-		ppl_results_canvas[0].width = ppl.width;
-		ppl_results_canvas[0].height = ppl.height;
+		ppl_preview_canvas.width = ppl.width;
+		ppl_preview_canvas.height = ppl.height;
+		pplCroppedCanvas.width = ppl.width;
+		pplCroppedCanvas.height = ppl.height;
+		ppl_results_canvas.width = ppl.width;
+		ppl_results_canvas.height = ppl.height;
 
 		ppl_preview_ctx.drawImage(ppl, 0, 0);
 		ppl_cropped_ctx.drawImage(ppl, 0, 0);
@@ -86,7 +91,57 @@ function pplHandleImage(e) {
 		margin.left = 0;
 		margin.bottom = 0;
 		margin.right = 0;
-		ppl_uploaded = true;
+		pplUploaded = true;
+
+		$('#ppl_preview').css("display", "block");
+		$('#ppl_upload_icon').css("display", "none");
+	}
+
+	xpl.onload = function () {
+		xpl_preview_canvas.width = xpl.width;
+		xpl_preview_canvas.height = xpl.height;
+		xplCroppedCanvas.width = xpl.width;
+		xplCroppedCanvas.height = xpl.height;
+		xpl_results_canvas.width = xpl.width;
+		xpl_results_canvas.height = xpl.height;
+
+		xpl_preview_ctx.drawImage(xpl, 0, 0);
+		xpl_cropped_ctx.drawImage(xpl, 0, 0);
+		xpl_results_ctx.drawImage(xpl, 0, 0);
+
+		margin.top = 0;
+		margin.left = 0;
+		margin.bottom = 0;
+		margin.right = 0;
+
+		$('#xpl_preview').css("display", "block");
+		$('#xpl_upload_icon').css("display", "none");
+	}
+
+	ppl.src = autoload + 'ppl.png';
+	xpl.src = autoload + 'xpl.png';
+}
+
+function pplHandleImage(e) {
+	ppl = new Image();
+
+	ppl.onload = function () {
+		ppl_preview_canvas.width = ppl.width;
+		ppl_preview_canvas.height = ppl.height;
+		pplCroppedCanvas.width = ppl.width;
+		pplCroppedCanvas.height = ppl.height;
+		ppl_results_canvas.width = ppl.width;
+		ppl_results_canvas.height = ppl.height;
+
+		ppl_preview_ctx.drawImage(ppl, 0, 0);
+		ppl_cropped_ctx.drawImage(ppl, 0, 0);
+		ppl_results_ctx.drawImage(ppl, 0, 0);
+
+		margin.top = 0;
+		margin.left = 0;
+		margin.bottom = 0;
+		margin.right = 0;
+		pplUploaded = true;
 
 		$('#loading').css("display", "none");
 
@@ -109,14 +164,14 @@ function xplHandleImage(e) {
 	xpl = new Image();
 
 	xpl.onload = function () {
-		if (ppl_uploaded) {
+		if (pplUploaded) {
 			if (xpl.width == ppl.width && xpl.height == ppl.height) {
-				xpl_preview_canvas[0].width = xpl.width;
-				xpl_preview_canvas[0].height = xpl.height;
-				xplCroppedCanvas[0].width = xpl.width;
-				xplCroppedCanvas[0].height = xpl.height;
-				xpl_results_canvas[0].width = xpl.width;
-				xpl_results_canvas[0].height = xpl.height;
+				xpl_preview_canvas.width = xpl.width;
+				xpl_preview_canvas.height = xpl.height;
+				xplCroppedCanvas.width = xpl.width;
+				xplCroppedCanvas.height = xpl.height;
+				xpl_results_canvas.width = xpl.width;
+				xpl_results_canvas.height = xpl.height;
 
 				xpl_preview_ctx.drawImage(xpl, 0, 0);
 				xpl_cropped_ctx.drawImage(xpl, 0, 0);
@@ -155,31 +210,29 @@ function crop() {
 		if (margin.left = prompt("enter the left margin (in px)", margin.left)) {
 			if (margin.bottom = prompt("enter the bottom margin (in px)", margin.bottom)) {
 				if (margin.right = prompt("enter the right margin (in px)", margin.right)) {
-					var new_width = ppl_preview_canvas[0].width - margin.right - margin.left;
-					var new_height = ppl_preview_canvas[0].height - margin.bottom - margin.top;
+					var new_width = ppl_preview_canvas.width - margin.right - margin.left;
+					var new_height = ppl_preview_canvas.height - margin.bottom - margin.top;
 
-					ppl_results_ctx.clearRect(0, 0, ppl_results_canvas[0].width, ppl_results_canvas[0].height);
-					xpl_results_ctx.clearRect(0, 0, xpl_results_canvas[0].width, xpl_results_canvas[0].height);
-					ppl_cropped_ctx.clearRect(0, 0, ppl_results_canvas[0].width, ppl_results_canvas[0].height);
-					xpl_cropped_ctx.clearRect(0, 0, xpl_results_canvas[0].width, xpl_results_canvas[0].height);
+					ppl_results_ctx.clearRect(0, 0, ppl_results_canvas.width, ppl_results_canvas.height);
+					xpl_results_ctx.clearRect(0, 0, xpl_results_canvas.width, xpl_results_canvas.height);
+					ppl_cropped_ctx.clearRect(0, 0, ppl_results_canvas.width, ppl_results_canvas.height);
+					xpl_cropped_ctx.clearRect(0, 0, xpl_results_canvas.width, xpl_results_canvas.height);
 
-					ppl_results_canvas[0].width = new_width;
-					ppl_results_canvas[0].height = new_height;
-					xpl_results_canvas[0].width = new_width;
-					xpl_results_canvas[0].height = new_height;
-					pplCroppedCanvas[0].width = new_width;
-					pplCroppedCanvas[0].height = new_height;
-					xplCroppedCanvas[0].width = new_width;
-					xplCroppedCanvas[0].height = new_height;
+					ppl_results_canvas.width = new_width;
+					ppl_results_canvas.height = new_height;
+					xpl_results_canvas.width = new_width;
+					xpl_results_canvas.height = new_height;
+					ppl_cropped_canvas.width = new_width;
+					ppl_cropped_canvas.height = new_height;
+					xpl_cropped_canvas.width = new_width;
+					xpl_cropped_canvas.height = new_height;
 
 					ppl_cropped_ctx.drawImage(ppl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
 					xpl_cropped_ctx.drawImage(xpl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
 					ppl_results_ctx.drawImage(ppl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
 					xpl_results_ctx.drawImage(xpl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
 
-					first_render = 0;
-
-					//addLog("Cropped Region: "+new_width+" x "+new_height+" px");
+					//add_log("Cropped Region: "+new_width+" x "+new_height+" px");
 				}
 			}
 		}
@@ -187,28 +240,35 @@ function crop() {
 }
 
 function start() {
+	$("#start_btn").prop('disabled',true);
 	$("#bottom-panel").fadeIn(200);
 
 	setObjectFromInputs(selectedObject);
 
-	imgDataPpl = ppl_cropped_ctx.getImageData(0, 0, pplCroppedCanvas[0].width, pplCroppedCanvas[0].height);
-	imgDataXpl = xpl_cropped_ctx.getImageData(0, 0, xplCroppedCanvas[0].width, xplCroppedCanvas[0].height);
-	totalPixels = pplCroppedCanvas[0].width * pplCroppedCanvas[0].height;
+	imgDataPpl = ppl_cropped_ctx.getImageData(0, 0, pplCroppedCanvas.width, pplCroppedCanvas.height);
+	imgDataXpl = xpl_cropped_ctx.getImageData(0, 0, xplCroppedCanvas.width, xplCroppedCanvas.height);
+	totalPixels = pplCroppedCanvas.width * pplCroppedCanvas.height;
 
-	setTimeout(initialization, 1, 1);
+	imgDataMaskAll = [];
+
+	let startObject = (onlySelected?selectedObject:1);
+	
+	setTimeout(initialization, 1, startObject);
 }
 
 function initialization(currentObject) {
 	object = getObject(currentObject);
 
 	validPixels[currentObject] = 0;
-	imgDataMask = [];
-	imgDataMaskB = [];
 	segments[currentObject] = [];
 	filtered[currentObject] = [];
+	comparisonValidPoints = [];
+
+	imgDataMask = [];
+	imgDataMaskB = [];
 
 	stats[currentObject] = {
-		min_area: pplCroppedCanvas[0].width * pplCroppedCanvas[0].height,
+		min_area: pplCroppedCanvas.width * pplCroppedCanvas.height,
 		max_area: 0,
 		min_compactness: 1,
 		max_compactness: 0,
@@ -223,9 +283,9 @@ function initialization(currentObject) {
 	updateStatus(currentObject, "Comparing colors...", 0);
 
 	addLog("Initializing '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "): min area: " + object.min_area + ', max area: ' + object.max_area + ', min_compactness: ' + object.min_compactness + ', max_compactness: ' + object.max_compactness + ', min_convexity: ' + object.min_convexity + ', max_convexity: ' + object.max_convexity + ', min_aspect_ratio=' + object.min_aspect_ratio + ', max_aspect_ratio=' + object.max_aspect_ratio + ', min_major_axis_angle: ' + object.min_major_axis_angle + ', max_major_axis_angle: ' + object.max_major_axis_angle);
-
+	
 	var perc = 0;
-	perc_add = Math.floor(100 / (imgDataPpl.data.length / 50000000));
+	percAdd = Math.floor(100 / (imgDataPpl.data.length / 50000000));
 
 	for (var start = 0; start < imgDataPpl.data.length; start += 50000000) {
 		if (start + 50000000 < imgDataPpl.data.length)
@@ -233,7 +293,7 @@ function initialization(currentObject) {
 		else
 			var end = imgDataPpl.data.length;
 
-		perc += perc_add;
+		perc += percAdd;
 
 		if (perc > 100)
 			perc = 100;
@@ -256,33 +316,38 @@ function comparison(currentObject, start, end, perc) {
 		ppl_tollerance[i] = object["ppl_tollerance_" + (i + 1)];
 		xpl_tollerance[i] = object["xpl_tollerance_" + (i + 1)];
 	}
-	
+
 	for (var i = start; i < end; i += 4) {
-		color1 = { 
-			r: imgDataPpl.data[i],
-			g: imgDataPpl.data[i + 1],
-			b: imgDataPpl.data[i + 2] 
-		};
+		if (typeof imgDataMaskAll[i / 4] == "undefined") {
+			color1 = { 
+				r: imgDataPpl.data[i],
+				g: imgDataPpl.data[i + 1],
+				b: imgDataPpl.data[i + 2] 
+			};
 
-		color2 = { 
-			r: imgDataXpl.data[i],
-			g: imgDataXpl.data[i + 1],
-			b: imgDataXpl.data[i + 2] 
-		};
+			color2 = { 
+				r: imgDataXpl.data[i],
+				g: imgDataXpl.data[i + 1],
+				b: imgDataXpl.data[i + 2] 
+			};
 
-		color1 = rgb2lab(color1);
-		color2 = rgb2lab(color2);
+			color1 = rgb2lab(color1);
+			color2 = rgb2lab(color2);
 
-		close = false;
-		for (var i2 = 0; i2 < object.max_colors; i2 += 1) {
-			const delta1 = deltaE(ppl_color_target_lab[i2], color1);
-			const delta2 = deltaE(xpl_color_target_lab[i2], color2);
-			if (ppl_tollerance[i2] >= delta1 && xpl_tollerance[i2] >= delta2)
-				close = true;
+			close = false;
+			for (var i2 = 0; i2 < object.max_colors; i2 += 1) {
+				const delta1 = deltaE(ppl_color_target_lab[i2], color1);
+				const delta2 = deltaE(xpl_color_target_lab[i2], color2);
+				if (ppl_tollerance[i2] >= delta1 && xpl_tollerance[i2] >= delta2)
+					close = true;
+			}
+		} else {
+			close = false;
 		}
 
 		if (close) {
 			imgDataMask[i / 4] = true;
+			imgDataMaskAll[i / 4] = true;
 		} else {
 			imgDataMask[i / 4] = false;
 		}
@@ -301,27 +366,27 @@ function preSegmentation(currentObject) {
 	imgDataMaskB = imgDataMask.slice();
 
 	var perc = 0;
-	perc_add = Math.floor(100 / (pplCroppedCanvas[0].width / 1000));
+	percAdd = Math.floor(100 / (pplCroppedCanvas.width / 1000));
 
-	for (var start = 0; start <= pplCroppedCanvas[0].width; start += 1000) {
-		if (start + 1000 < pplCroppedCanvas[0].width)
+	for (var start = 0; start <= pplCroppedCanvas.width; start += 1000) {
+		if (start + 1000 < pplCroppedCanvas.width)
 			var end = start + 1000;
 		else 
-			var end = pplCroppedCanvas[0].width;
+			var end = pplCroppedCanvas.width;
 
-		perc += perc_add;
+		perc += percAdd;
 		setTimeout(segmentation, 1, currentObject, start, end, perc);
 	}
 }
 
 function segmentation(currentObject, x_start, x_end, perc) {
 	for (var x = x_start; x < x_end; x += 1) {
-		for (var y = 0; y < pplCroppedCanvas[0].height; y += 1) {
-			pixelPos = (y * pplCroppedCanvas[0].width + x);
+		for (var y = 0; y < pplCroppedCanvas.height; y += 1) {
+			pixelPos = (y * pplCroppedCanvas.width + x);
 			if (imgDataMask[pixelPos]) {
 
-				segment_points = [];
-				segment_perimeter = [];
+				segmentAreaPixels = [];
+				segmentPerimeterPixels = [];
 
 				var pixelStack = [[x, y]];
 
@@ -331,16 +396,16 @@ function segmentation(currentObject, x_start, x_end, perc) {
 					xx = newPos[0];
 					yy = newPos[1];
 
-					pixelPos = (yy * pplCroppedCanvas[0].width + xx);
+					pixelPos = (yy * pplCroppedCanvas.width + xx);
 					while (yy-- >= 0 && imgDataMask[pixelPos]) {
-						pixelPos -= pplCroppedCanvas[0].width;
+						pixelPos -= pplCroppedCanvas.width;
 					}
-					pixelPos += pplCroppedCanvas[0].width;
+					pixelPos += pplCroppedCanvas.width;
 
 					++yy;
 					reachLeft = false;
 					reachRight = false;
-					while (yy++ < pplCroppedCanvas[0].height - 1 && imgDataMask[pixelPos]) {
+					while (yy++ < pplCroppedCanvas.height - 1 && imgDataMask[pixelPos]) {
 						addPixel(pixelPos);
 
 						if (xx > 0) {
@@ -355,7 +420,7 @@ function segmentation(currentObject, x_start, x_end, perc) {
 							}
 						}
 
-						if (xx < pplCroppedCanvas[0].width - 1) {
+						if (xx < pplCroppedCanvas.width - 1) {
 							if (imgDataMask[pixelPos + 1]) {
 								if (!reachRight) {
 									pixelStack.push([xx + 1, yy]);
@@ -366,18 +431,18 @@ function segmentation(currentObject, x_start, x_end, perc) {
 								reachRight = false;
 							}
 						}
-						pixelPos += pplCroppedCanvas[0].width;
+						pixelPos += pplCroppedCanvas.width;
 					}
 				}
 				
 				segments[currentObject].push({
-					areaPixels: segment_points,
-					perimeterPixels: segment_perimeter
+					areaPixels: segmentAreaPixels,
+					perimeterPixels: segmentPerimeterPixels
 				});
 			}
 		}
 
-		if (x == pplCroppedCanvas[0].width - 1) {
+		if (x == pplCroppedCanvas.width - 1) {
 			updateStatus(currentObject, "Segmentation...", perc);
 			setTimeout(preFiltering, 1, currentObject);
 		} else {
@@ -387,10 +452,10 @@ function segmentation(currentObject, x_start, x_end, perc) {
 }
 
 function preFiltering(currentObject) {
-	updateStatus(currentObject, "Filtering..", 0);
+	updateStatus(currentObject, "Filtering...", 0);
 
 	var perc = 0;
-	perc_add = Math.floor(100 / (segments[currentObject].length / 1000));
+	percAdd = Math.floor(100 / (segments[currentObject].length / 1000));
 
 	for (var start = 0; start <= segments[currentObject].length; start += 1000) {
 		if (start + 1000 < segments[currentObject].length)
@@ -398,7 +463,7 @@ function preFiltering(currentObject) {
 		else 
 			var end = segments[currentObject].length;
 
-		perc += perc_add;
+		perc += percAdd;
 		setTimeout(filtering, 1, currentObject, start, end, perc);
 	}
 }
@@ -519,6 +584,13 @@ function filtering(currentObject, start, end, perc) {
 							centroid: {
 								x: centroid.x + parseInt(margin.left),
 								y: centroid.y + parseInt(margin.top)
+							},
+							stats: {
+								compactness,
+								convexity,
+								aspectRatio: aspect_ratio,
+								minorAxisAngle: minor_axis.angle,
+								majorAxisAngle: major_axis.angle
 							}
 						});
 
@@ -543,11 +615,14 @@ function rendering(currentObject) {
 
 		var renderColorRgb = hexToRgb(object.render_color);
 
+		if (comparisonPoints.length > 0)
+			var renderSegmentColorRgb = hexToRgb(object.render_segment_color);
+
 		if (object.render_mode == "fill") {
 			for (var i = 0; i < segment.areaPixels.length; i += 1) {
 				var point = segment.areaPixels[i];
 				
-				var pos = point[1] * (pplCroppedCanvas[0].width * 4) + (point[0] * 4);
+				var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
 
 				imgDataPpl.data[pos] = renderColorRgb.r;
 				imgDataPpl.data[pos + 1] = renderColorRgb.g;
@@ -556,18 +631,18 @@ function rendering(currentObject) {
 				imgDataXpl.data[pos + 1] = renderColorRgb.g;
 				imgDataXpl.data[pos + 2] = renderColorRgb.b;
 
-				if (comparisonPoints.some(e => e.x == point[0] && e.y == point[1])) {
+				if (comparisonPoints.some(e => e.name == object.obj_name && e.x == point[0] + parseInt(margin.left) && e.y == point[1] + parseInt(margin.top))) {
 					for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
 						var point = segment.areaPixels[ii];
 
-						var pos = point[1] * (pplCroppedCanvas[0].width * 4) + (point[0] * 4);
+						var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
 
-						imgDataPpl.data[pos] = 0;
-						imgDataPpl.data[pos + 1] = renderColorRgb.g;
-						imgDataPpl.data[pos + 2] = 0;
-						imgDataXpl.data[pos] = 0;
-						imgDataXpl.data[pos + 1] = renderColorRgb.g;
-						imgDataXpl.data[pos + 2] = 0;
+						imgDataPpl.data[pos] = renderSegmentColorRgb.r;
+						imgDataPpl.data[pos + 1] = renderSegmentColorRgb.g;
+						imgDataPpl.data[pos + 2] = renderSegmentColorRgb.b;
+						imgDataXpl.data[pos] = renderSegmentColorRgb.r;
+						imgDataXpl.data[pos + 1] = renderSegmentColorRgb.g;
+						imgDataXpl.data[pos + 2] = renderSegmentColorRgb.b;
 					}
 					i = segment.areaPixels.length;
 					
@@ -580,7 +655,7 @@ function rendering(currentObject) {
 			for (var i = 0; i < segment.perimeterPixels.length; i += 1) {
 				var point = segment.perimeterPixels[i];
 
-				var pos = point[1] * (pplCroppedCanvas[0].width * 4) + (point[0] * 4);
+				var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
 
 				imgDataPpl.data[pos] = renderColorRgb.r;
 				imgDataPpl.data[pos + 1] = renderColorRgb.g;
@@ -599,15 +674,20 @@ function rendering(currentObject) {
 	}
 
 	if (comparisonPoints.length > 0) {
-		addLog("Object '" + object.obj_name + "' points comparasion completed: valid comparasion points: " + comparisonValidPoints.length + "/" + comparisonPoints.length + '(' + ((comparisonValidPoints.length * 100) / comparisonPoints.length).toFixed(2) + " %), valid comparasion points on valid segments: " + comparisonValidPoints.length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints.length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
+		addLog("Object '" + object.obj_name + "' points comparision completed: valid points: " + comparisonValidPoints.length + "/" + comparisonPoints.length + '(' + ((comparisonValidPoints.length * 100) / comparisonPoints.length).toFixed(2) + " %), valid points on valid segments: " + comparisonValidPoints.length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints.length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
 	}
 
 	setTimeout(print, 1);
-	first_render = 1;
+	firstRender = 1;
 
 	if (currentObject < maxObjects) {
-		setTimeout(initialization, 1, currentObject + 1);
+		if (onlySelected) {
+			$("#start_btn").prop('disabled', false);
+			updateStatus(1, "Completed.", 100);
+		} else
+			setTimeout(initialization, 1, currentObject + 1);
 	} else {
+		$("#start_btn").prop('disabled', false);
 		updateStatus(1, "Completed.", 100);
 	}
 }
@@ -624,7 +704,7 @@ function hexToRgb(hex) {
 //Copyright (c) 2014 Kevin Kwok <antimatter15@gmail.com>
 function rgb2lab(color) {
 	const key = color.r + color.g + color.b;
-	if (typeof lab_colors[key] == 'undefined') {
+	if (typeof labColors[key] == 'undefined') {
 		var r = color.r / 255,
 		g = color.g / 255,
 		b = color.b / 255,
@@ -644,11 +724,11 @@ function rgb2lab(color) {
 	
 		var ret = [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
 
-		lab_colors[key] = ret;
+		labColors[key] = ret;
 
 		return ret;
 	} else {
-		return lab_colors[key];
+		return labColors[key];
 	}
 }
 
@@ -737,7 +817,7 @@ function updateStatus(currentObject, status, perc) {
 
 	$("#progress-bar").css("width", perc + "%");
 	$("#status").html(status);
-	$("#currentObject").html(currentObject);
+	$("#obj_current").html(currentObject);
 }
 
 function print() {
@@ -746,48 +826,48 @@ function print() {
 }
 
 function addPixel(pixelPos) {
-	var p_x = (pixelPos) % pplCroppedCanvas[0].width;
-	var p_y = Math.floor((pixelPos) / pplCroppedCanvas[0].width);
+	var x = (pixelPos) % pplCroppedCanvas.width;
+	var y = Math.floor((pixelPos) / pplCroppedCanvas.width);
 
 	imgDataMask[pixelPos] = false;
 
-	segment_points.push([p_x, p_y]);
+	segmentAreaPixels.push([x, y]);
 
-	var pixelPos_top = pixelPos - (pplCroppedCanvas[0].width);
-	var pixelPos_left = pixelPos - 1;
-	var pixelPos_right = pixelPos + 1;
-	var pixelPos_bottom = pixelPos + (pplCroppedCanvas[0].width);
+	var pixelPosTop = pixelPos - (pplCroppedCanvas.width);
+	var pixelPosLeft = pixelPos - 1;
+	var pixelPosRight = pixelPos + 1;
+	var pixelPosBottom = pixelPos + (pplCroppedCanvas.width);
 
-	if (pixelPos_top >= 0) {
-		if (imgDataMaskB[pixelPos_top] == false) {
-			segment_perimeter.push([p_x, p_y]);
+	if (pixelPosTop >= 0) {
+		if (imgDataMaskB[pixelPosTop] == false) {
+			segmentPerimeterPixels.push([x, y]);
 		}
 	} else {
-		segment_perimeter.push([p_x, p_y]);
+		segmentPerimeterPixels.push([x, y]);
 	}
 
-	if (pixelPos_left >= p_y * (pplCroppedCanvas[0].width)) {
-		if (imgDataMaskB[pixelPos_left] == false) {
-			segment_perimeter.push([p_x, p_y]);
+	if (pixelPosLeft >= y * (pplCroppedCanvas.width)) {
+		if (imgDataMaskB[pixelPosLeft] == false) {
+			segmentPerimeterPixels.push([x, y]);
 		}
 	} else {
-		segment_perimeter.push([p_x, p_y]);
+		segmentPerimeterPixels.push([x, y]);
 	}
 
-	if (pixelPos_bottom <= (pplCroppedCanvas[0].width) * pplCroppedCanvas[0].height) {
-		if (imgDataMaskB[pixelPos_bottom] == false) {
-			segment_perimeter.push([p_x, p_y]);
+	if (pixelPosBottom <= (pplCroppedCanvas.width) * pplCroppedCanvas.height) {
+		if (imgDataMaskB[pixelPosBottom] == false) {
+			segmentPerimeterPixels.push([x, y]);
 		}
 	} else {
-		segment_perimeter.push([p_x, p_y]);
+		segmentPerimeterPixels.push([x, y]);
 	}
 
-	if (pixelPos_right < (p_y + 1) * (pplCroppedCanvas[0].width)) {
-		if (imgDataMaskB[pixelPos_right] == false) {
-			segment_perimeter.push([p_x, p_y]);
+	if (pixelPosRight < (y + 1) * (pplCroppedCanvas.width)) {
+		if (imgDataMaskB[pixelPosRight] == false) {
+			segmentPerimeterPixels.push([x, y]);
 		}
 	} else {
-		segment_perimeter.push([p_x, p_y]);
+		segmentPerimeterPixels.push([x, y]);
 	}
 }
 
@@ -843,17 +923,19 @@ function convexHull(points) {
 
 function openPicker(mode, el) {
 	if (ppl && xpl) {
-		picker_color_n = $(el).parents('.color').attr('data-number');
+		pickerColorN = $(el).parents('.color').attr('data-number');
+
 		if (mode == 1) {
-			picker_canvas[0].width = ppl_preview_canvas[0].width;
-			picker_canvas[0].height = ppl_preview_canvas[0].height;
-			picker_canvas_ctx.drawImage(ppl, 0, 0);
+			pickerCanvas.width = ppl_preview_canvas.width;
+			pickerCanvas.height = ppl_preview_canvas.height;
+			pickerCanvasCtx.drawImage(ppl, 0, 0);
 		}
 		if (mode == 2) {
-			picker_canvas[0].width = xpl_preview_canvas[0].width;
-			picker_canvas[0].height = xpl_preview_canvas[0].height;
-			picker_canvas_ctx.drawImage(xpl, 0, 0);
+			pickerCanvas.width = xpl_preview_canvas.width;
+			pickerCanvas.height = xpl_preview_canvas.height;
+			pickerCanvasCtx.drawImage(xpl, 0, 0);
 		}
+
 		$("#main-view").css("display", "none");
 		$("#picker-view").css("display", "block");
 	} else {
@@ -861,14 +943,14 @@ function openPicker(mode, el) {
 	}
 }
 
-function get_segment(event) {
+function getSegment(event) {
 	var pos_x = event.clientX + Math.round(window.pageXOffset);
 	var pos_y = event.clientY + Math.round(window.pageYOffset);
 
-	var imgDataPpl = ppl_preview_ctx.getImageData(0, 0, ppl_preview_canvas[0].width, ppl_preview_canvas[0].height);
-	var imgDataXpl = xpl_preview_ctx.getImageData(0, 0, ppl_preview_canvas[0].width, ppl_preview_canvas[0].height);
+	var imgDataPpl = ppl_preview_ctx.getImageData(0, 0, ppl_preview_canvas.width, ppl_preview_canvas.height);
+	var imgDataXpl = xpl_preview_ctx.getImageData(0, 0, ppl_preview_canvas.width, ppl_preview_canvas.height);
 
-	var pixelPos = (pos_y * ppl_preview_canvas[0].width + pos_x) * 4;
+	var pixelPos = (pos_y * ppl_preview_canvas.width + pos_x) * 4;
 
 	var color_target1 = {
 		r: imgDataPpl.data[pixelPos],
@@ -885,8 +967,8 @@ function get_segment(event) {
 	var color1 = rgbToHex(color_target1.r, color_target1.g, color_target1.b);
 	var color2 = rgbToHex(color_target2.r, color_target2.g, color_target2.b);
 
-	$('#ppl_color_target_' + picker_color_n).val(color1);
-	$('#xpl_color_target_' + picker_color_n).val(color2);
+	$('#ppl_color_target_' + pickerColorN).val(color1);
+	$('#xpl_color_target_' + pickerColorN).val(color2);
 
 	$("#main-view").css('display', 'block');
 	$("#picker-view").css('display', 'none');
@@ -1067,8 +1149,8 @@ function loadObj(event) {
 
 		$("#prev_obj").css("opacity", "0.5");
 
-		$("#maxObjects,#maxObjects_2").html(maxObjects);
-		$("#selectedObject").html(selectedObject);
+		$("#obj_max,#obj_max_2").html(maxObjects);
+		$("#obj_selected").html(selectedObject);
 	};
 }
 
@@ -1081,30 +1163,37 @@ function saveObj() {
 
 function importPoints(event) {
 	var file = event.target.files[0];
+	var columnName = '';
+	
 	if (!file) {
 		return;
 	}
-	var reader = new FileReader();
 
-	reader.readAsText(file);
-	reader.onload = function (e) {
-		var json = JSON.parse(e.target.result);
+	if (columnName = prompt('Insert object name column', 'descr')) {
+		var reader = new FileReader();
 
-		json.features.forEach(function (feature) {
-			var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
-			var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
+		reader.readAsText(file);
+		reader.onload = function (e) {
+			comparisonPoints = [];
 
-			comparisonPoints.push({
-				name: feature.properties.name,
-				x,
-				y
+			var json = JSON.parse(e.target.result);
+
+			json.features.forEach(function (feature) {
+				var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
+				var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
+
+				comparisonPoints.push({
+					name: feature.properties[columnName],
+					x,
+					y
+				});
 			});
-		});
 
-		alert(comparisonPoints.length + ' points imported');
+			alert(comparisonPoints.length + ' points imported');
 
-		$('#render_segment_color_container').slideDown(200);
-	};
+			$('#render_segment_color_container').slideDown(200);
+		};
+	}
 }
 
 /* BUTTONS */
@@ -1115,7 +1204,7 @@ function prevObjBtn() {
 		selectedObject -= 1;
 		setInputsFromObject(selectedObject);
 
-		$("#selectedObject").html(selectedObject);
+		$("#obj_selected").html(selectedObject);
 	}
 
 	if (selectedObject == maxObjects) {
@@ -1137,7 +1226,7 @@ function nextObjBtn() {
 		selectedObject += 1;
 		setInputsFromObject(selectedObject);
 
-		$("#selectedObject").html(selectedObject);
+		$("#obj_selected").html(selectedObject);
 	}
 
 	if (selectedObject == maxObjects) {
@@ -1166,7 +1255,7 @@ function addObjBtn() {
 		ppl_tollerance_1: '15',
 		xpl_tollerance_1: '15',
 		max_colors: 1,
-		min_area: 10,
+		min_area: 5,
 		max_area: 100000,
 		min_compactness: 0,
 		max_compactness: 1,
@@ -1208,7 +1297,7 @@ function deleteObjBtn() {
 			$("#next_obj").css("opacity", "0.5");
 		}
 
-		$("#selectedObject").html(selectedObject);
+		$("#obj_selected").html(selectedObject);
 		$("#obj_max,#obj_max_2").html(maxObjects);
 	}
 }
