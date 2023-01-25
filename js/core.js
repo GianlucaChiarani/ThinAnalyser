@@ -222,7 +222,7 @@ function pplHandleImage(e) {
 
 	ppl.onerror = function () {
 		$('#loading').css("display", "none");
-		alert('File not valid');
+		bootbox.alert('File not valid');
 	};
 
 	if (typeof e.target.files[0] != 'undefined') {
@@ -258,10 +258,10 @@ function xplHandleImage(e) {
 				$('#xpl_preview').css("display", "block");
 				$('#xpl_upload_icon').css("display", "none");
 			} else {
-				alert("PPL & XPL images haven't same size.");
+				bootbox.alert("PPL & XPL images haven't same size.");
 			}
 		} else {
-			alert("You must upload PPL image before.");
+			bootbox.alert("You must upload PPL image before.");
 		}
 
 		$('#loading').css("display", "none");
@@ -269,7 +269,7 @@ function xplHandleImage(e) {
 
 	xpl.onerror = function () {
 		$('#loading').css("display", "none");
-		alert('File not valid');
+		bootbox.alert('File not valid');
 	};
 
 	if (typeof e.target.files[0] != 'undefined') {
@@ -279,17 +279,30 @@ function xplHandleImage(e) {
 }
 
 function crop() {
-	if (margin.top = prompt("enter the top margin (in px)", margin.top)) {
-		if (margin.right = prompt("enter the right margin (in px)", margin.right)) {
-			if (margin.bottom = prompt("enter the bottom margin (in px)", margin.bottom)) {
-				if (margin.left = prompt("enter the left margin (in px)", margin.left)) {
-					if (margin.offsetX = prompt("enter the horizontal XPL offset (in px)", margin.offsetX)) {
-						if (margin.offsetY = prompt("enter the vertical XPL offset (in px)", margin.offsetY)) {
+	bootbox.prompt({
+		title: "enter top, right, bottom, left margin (in px)", 
+		value: margin.top + ',' + margin.right + ',' + margin.bottom + ',' + margin.left,
+		callback: function(margins) {
+			if (margins) {
+				margins = margins.split(',');
+				margin.top = margins[0];
+				margin.right = margins[1];
+				margin.bottom = margins[2];
+				margin.left = margins[3];
+
+				bootbox.prompt({
+					title: "enter horizontal & vertical XPL offset (in px)",
+					value: margin.offsetX + ',' + margin.offsetY,
+					callback: function (offsets) {
+						if (offsets) {
+							offsets = offsets.split(',');
+							margin.offsetX = offsets[0];
+							margin.offsetY = offsets[1];
 
 							for (let k in margin) {
 								margin[k] = parseInt(margin[k]);
 							}
- 
+
 							var width = pplPreviewCanvas.width - margin.right - margin.left;
 							var height = pplPreviewCanvas.height - margin.bottom - margin.top;
 							
@@ -320,10 +333,10 @@ function crop() {
 							//add_log("Cropped Region: "+new_width+" x "+new_height+" px");
 						}
 					}
-				}
+				});
 			}
 		}
-	}
+	});
 }
 
 function start() {
@@ -1077,7 +1090,7 @@ function openPicker(mode, el) {
 		$("#main-view").css("display", "none");
 		$("#picker-view").css("display", "block");
 	} else {
-		alert("You must upload both images before.");
+		bootbox.alert("You must upload both images before.");
 	}
 }
 
@@ -1306,9 +1319,134 @@ function importSegments(event) {
 		return;
 	}
 
-	if (columnName = prompt('Insert object column name', columnName)) {
-		if (defaultTollerance.ppl = prompt('Insert default PPL tollerance', defaultTollerance.ppl)) {
-			if (defaultTollerance.xpl = prompt('Insert default XPL tollerance', defaultTollerance.xpl)) {
+	bootbox.prompt({
+		title: "Insert object column name",
+		value: columnName,
+		callback: function(columnName) {
+			bootbox.prompt({
+				title: "Insert default PPL & XPL tollerance",
+				value: defaultTollerance.ppl + "," + defaultTollerance.xpl,
+				callback: function (defaultTollerances) {
+					defaultTollerances = defaultTollerances.split(',');
+					defaultTollerance = {
+						ppl: defaultTollerances[0],
+						xpl: defaultTollerances[1],
+					}
+
+					var reader = new FileReader();
+
+					reader.readAsText(file);
+					reader.onload = function (e) {
+						var points = [];
+
+						var json = JSON.parse(e.target.result);
+
+						json.features.forEach(function (feature) {
+							var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
+							var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
+
+							points.push({
+								name: feature.properties[columnName],
+								x: x + margin.left,
+								y: y + margin.top
+							});
+						});
+
+						bootbox.confirm('Do you really want to import object names and colors? The current objects will be overwritten.', function (yes) {
+							if (yes) {
+								trainingPoints = points;
+
+								var newObjects = {};
+
+								imgDataPpl = pplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+								imgDataXpl = xplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+
+								points.forEach(function (object) {
+									var objectColor = {
+										ppl: getColorFromPosition(imgDataPpl, object.x, object.y),
+										xpl: getColorFromPosition(imgDataXpl, object.x, object.y)
+									};
+
+									if (typeof newObjects[object.name] == 'undefined') {
+										newObjects[object.name] = {
+											obj_name: object.name,
+											ppl_color_target_1: objectColor.ppl,
+											ppl_tollerance_1: defaultTollerance.ppl,
+											xpl_color_target_1: objectColor.xpl,
+											xpl_tollerance_1: defaultTollerance.xpl,
+											max_colors: 1,
+											render_color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+										};
+									} else {
+										var close = false;
+										var objectColorLab = {
+											ppl: rgb2lab(hexToRgb(objectColor.ppl)),
+											xpl: rgb2lab(hexToRgb(objectColor.xpl))
+										};
+
+										for (var i = 0; i < newObjects[object.name].max_colors; i += 1) {
+											var otherColor = {
+												ppl: rgb2lab(hexToRgb(newObjects[object.name]["ppl_color_target_" + (i + 1)])),
+												xpl: rgb2lab(hexToRgb(newObjects[object.name]["xpl_color_target_" + (i + 1)]))
+											}
+											var deltaPpl = deltaE(otherColor.ppl, objectColorLab.ppl);
+											var deltaXpl = deltaE(otherColor.xpl, objectColorLab.xpl);
+
+											if (defaultTollerance.ppl >= deltaPpl && defaultTollerance.xpl >= deltaXpl)
+												close = true;
+										}
+
+										if (!close) {
+											var colorIndex = newObjects[object.name].max_colors + 1;
+											newObjects[object.name].max_colors = colorIndex;
+											newObjects[object.name]['ppl_color_target_' + colorIndex] = objectColor.ppl;
+											newObjects[object.name]['xpl_color_target_' + colorIndex] = objectColor.xpl;
+											newObjects[object.name]['ppl_tollerance_' + colorIndex] = defaultTollerance.ppl;
+											newObjects[object.name]['xpl_tollerance_' + colorIndex] = defaultTollerance.xpl;
+										}
+									}
+								});
+
+								objects = [];
+								for (let i in newObjects) {
+									objects.push(newObjects[i]);
+								}
+
+								selectedObject = 1;
+								maxObjects = objects.length;
+
+								setInputsFromObject(selectedObject);
+
+								$("#obj_max,#obj_max_2").html(maxObjects);
+								$("#obj_selected").html(selectedObject);
+
+								if (maxObjects > 1) {
+									$("#next_obj,#remove_obj").css("opacity", "1");
+								}
+
+								bootbox.alert(maxObjects + ' objects imported');
+							}
+						});
+					};
+				}
+			});
+		}
+	});
+}
+
+function importPoints(event) {
+	var file = event.target.files[0];
+	var columnName = 'descr';
+
+	if (!file) {
+		return;
+	}
+
+	bootbox.prompt({
+		title: 'Insert object column name',
+		value: columnName,
+		callback: function (columnName) {
+			if (columnName) {
 				var reader = new FileReader();
 
 				reader.readAsText(file);
@@ -1321,6 +1459,11 @@ function importSegments(event) {
 						var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
 						var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
 
+						if (customWidth) {
+							x = Math.round(x * ((customWidth / originalSize.width)));
+							y = Math.round(y * ((customWidth / originalSize.width)));
+						}
+
 						points.push({
 							name: feature.properties[columnName],
 							x,
@@ -1328,127 +1471,17 @@ function importSegments(event) {
 						});
 					});
 
-					if (confirm('Do you really want to import object names and colors? The current objects will be overwritten.')) {
-						trainingPoints = points;
+					comparisonPoints = points;
 
-						var newObjects = {};
+					bootbox.alert(comparisonPoints.length + ' points imported');
 
-						imgDataPpl = pplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
-						imgDataXpl = xplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+					if (comparisonPoints.length)
+						$('#render_segment_color_container').slideDown(200);
 
-						points.forEach(function (object) {
-							var objectColor = {
-								ppl: getColorFromPosition(imgDataPpl, object.x, object.y),
-								xpl: getColorFromPosition(imgDataXpl, object.x, object.y)
-							};
-
-							if (typeof newObjects[object.name] == 'undefined') {
-								newObjects[object.name] = {
-									obj_name: object.name,
-									ppl_color_target_1: objectColor.ppl,
-									ppl_tollerance_1: defaultTollerance.ppl,
-									xpl_color_target_1: objectColor.xpl,
-									xpl_tollerance_1: defaultTollerance.xpl,
-									max_colors: 1,
-									render_color: '#' + Math.floor(Math.random() * 16777215).toString(16)
-								};
-							} else {
-								var close = false;
-								var objectColorLab = {
-									ppl: rgb2lab(hexToRgb(objectColor.ppl)),
-									xpl: rgb2lab(hexToRgb(objectColor.xpl))
-								};
-								
-								for (var i = 0; i < newObjects[object.name].max_colors; i += 1) {
-									var otherColor = {
-										ppl: rgb2lab(hexToRgb(newObjects[object.name]["ppl_color_target_" + (i + 1)])),
-										xpl: rgb2lab(hexToRgb(newObjects[object.name]["xpl_color_target_" + (i + 1)]))
-									}
-									var deltaPpl = deltaE(otherColor.ppl, objectColorLab.ppl);
-									var deltaXpl = deltaE(otherColor.xpl, objectColorLab.xpl);
-
-									if (defaultTollerance.ppl >= deltaPpl && defaultTollerance.xpl >= deltaXpl)
-										close = true;
-								}
-
-								if (!close) {
-									var colorIndex = newObjects[object.name].max_colors + 1;
-									newObjects[object.name].max_colors = colorIndex;
-									newObjects[object.name]['ppl_color_target_' + colorIndex] = objectColor.ppl;
-									newObjects[object.name]['xpl_color_target_' + colorIndex] = objectColor.xpl;
-									newObjects[object.name]['ppl_tollerance_' + colorIndex] = defaultTollerance.ppl;
-									newObjects[object.name]['xpl_tollerance_' + colorIndex] = defaultTollerance.xpl;
-								}
-							}
-						});
-
-						objects = [];
-						for (let i in newObjects) {
-							objects.push(newObjects[i]);
-						}
-
-						selectedObject = 1;
-						maxObjects = objects.length;
-
-						setInputsFromObject(selectedObject);
-
-						$("#obj_max,#obj_max_2").html(maxObjects);
-						$("#obj_selected").html(selectedObject);
-
-						if (maxObjects > 1) {
-							$("#next_obj,#remove_obj").css("opacity", "1");
-						}
-
-						alert(maxObjects + ' objects imported');
-					}
 				};
 			}
 		}
-	}
-}
-
-function importPoints(event) {
-	var file = event.target.files[0];
-	var columnName = '';
-
-	if (!file) {
-		return;
-	}
-
-	if (columnName = prompt('Insert object column name', 'descr')) {
-		var reader = new FileReader();
-
-		reader.readAsText(file);
-		reader.onload = function (e) {
-			var points = [];
-
-			var json = JSON.parse(e.target.result);
-
-			json.features.forEach(function (feature) {
-				var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
-				var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
-
-				if (customWidth) {
-					x = Math.round(x * ((customWidth / originalSize.width)));
-					y = Math.round(y * ((customWidth / originalSize.width)));
-				}
-
-				points.push({
-					name: feature.properties[columnName],
-					x,
-					y
-				});
-			});
-
-			comparisonPoints = points;
-
-			alert(comparisonPoints.length + ' points imported');
-
-			if (comparisonPoints.length)
-				$('#render_segment_color_container').slideDown(200);
-
-		};
-	}
+	});
 }
 
 /* BUTTONS */
