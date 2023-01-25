@@ -80,6 +80,7 @@ html, body {
 	box-sizing: border-box;
 	height: 270px;
 	overflow-y: scroll;
+	user-select: text;
 }
 #log div{
 	display: block;

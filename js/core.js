@@ -1,30 +1,30 @@
 /* 
-	Thin-analyser image processor v. 1.0
+	Thin-analyser image processor v. 1.3
 	Copyright (c) 2020-2022 Gianluca Chiarani <gianluca.chiarani@gmail.com>
 	GNU General Public License (GPL)
 */
 
 "use strict";
 
-var ppl_preview_canvas = document.getElementById('ppl_preview_canvas');
-var xpl_preview_canvas = document.getElementById('xpl_preview_canvas');
+var pplPreviewCanvas = document.getElementById('ppl_preview_canvas');
+var xplPreviewCanvas = document.getElementById('xpl_preview_canvas');
 
 var pplCroppedCanvas = document.getElementById('ppl_cropped_canvas');
 var xplCroppedCanvas = document.getElementById('xpl_cropped_canvas');
 
-var ppl_results_canvas = document.getElementById('ppl_results_canvas');
-var xpl_results_canvas = document.getElementById('xpl_results_canvas');
+var pplResultsCanvas = document.getElementById('ppl_results_canvas');
+var xplResultsCanvas = document.getElementById('xpl_results_canvas');
 
 var pickerCanvas = document.getElementById('picker-canvas');
 
-var ppl_preview_ctx = ppl_preview_canvas.getContext('2d', { willReadFrequently: true});
-var xpl_preview_ctx = xpl_preview_canvas.getContext('2d', { willReadFrequently: true });
+var pplPreviewCtx = pplPreviewCanvas.getContext('2d', { willReadFrequently: true});
+var xplPreviewCtx = xplPreviewCanvas.getContext('2d', { willReadFrequently: true });
 
-var ppl_cropped_ctx = pplCroppedCanvas.getContext('2d', { willReadFrequently: true });
-var xpl_cropped_ctx = xplCroppedCanvas.getContext('2d', { willReadFrequently: true });
+var pplCroppedCtx = pplCroppedCanvas.getContext('2d', { willReadFrequently: true });
+var xplCroppedCtx = xplCroppedCanvas.getContext('2d', { willReadFrequently: true });
 
-var ppl_results_ctx = ppl_results_canvas.getContext("2d", { willReadFrequently: true });
-var xpl_results_ctx = xpl_results_canvas.getContext("2d", { willReadFrequently: true });
+var pplResultsCtx = pplResultsCanvas.getContext("2d", { willReadFrequently: true });
+var xplResultsCtx = xplResultsCanvas.getContext("2d", { willReadFrequently: true });
 
 var pickerCanvasCtx = pickerCanvas.getContext("2d", { willReadFrequently: true });
 
@@ -38,9 +38,11 @@ var totalPixels, segmentPerimeterPixels, segmentAreaPixels;
 var segments = [];
 var validPixels = []
 var filtered = [];
-var filteredExport = [];
 var stats = [];
+var statsProperties = ['area','compactness','convexity','aspectRatio','majorAxisAngle'];
 var labColors = {};
+
+var pplColorTargetLab, xplColorTargetLab;
 
 var imgDataPpl, imgDataXpl, imgDataMask, imgDataMaskB, imgDataMaskAll;
 var status;
@@ -49,7 +51,9 @@ var margin = {
 	top: 0,
 	left: 0,
 	bottom: 0,
-	right: 0
+	right: 0,
+	offsetX: 0,
+	offsetY: 0
 }
 
 var object = {};
@@ -61,36 +65,51 @@ var cropper = false;
 var pickerColorN = 1;
 
 var firstRender = 0; 
-var onlySelected = false;
 
-var comparisonPoints = [], comparisonValidPoints = [];
+/* CUSTOM PARAMS */
+var onlySelected = false;
+var onlyFiltering = false;
+var customWidth = false;
+var originalSize = {
+	width: 0,
+	height: 0
+}
+
+var comparisonPoints = [], comparisonValidPoints = [], trainingPoints = [], filteredTrainingPoints = [];
 
 $('#ppl_loader').on('change', pplHandleImage);
 $('#xpl_loader').on('change', xplHandleImage);
 $('#obj_loader').on('change', loadObj);
+$('#segments_loader').on('change', importSegments);
 $('#points_loader').on('change', importPoints);
 
-var autoload = 'test/';
+var autoload = 'test/48a/';
 if (autoload) {
 	ppl = new Image();
 	xpl = new Image();
 
 	ppl.onload = function () {
-		ppl_preview_canvas.width = ppl.width;
-		ppl_preview_canvas.height = ppl.height;
+		originalSize = {
+			width: ppl.width,
+			height: ppl.height
+		};
+
+		if (customWidth) {
+			ppl.width = customWidth;
+			ppl.height = originalSize.height * (customWidth / originalSize.width);
+		}
+
+		pplPreviewCanvas.width = ppl.width;
+		pplPreviewCanvas.height = ppl.height;
 		pplCroppedCanvas.width = ppl.width;
 		pplCroppedCanvas.height = ppl.height;
-		ppl_results_canvas.width = ppl.width;
-		ppl_results_canvas.height = ppl.height;
+		pplResultsCanvas.width = ppl.width;
+		pplResultsCanvas.height = ppl.height;
 
-		ppl_preview_ctx.drawImage(ppl, 0, 0);
-		ppl_cropped_ctx.drawImage(ppl, 0, 0);
-		ppl_results_ctx.drawImage(ppl, 0, 0);
+		pplPreviewCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
+		pplCroppedCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
+		pplResultsCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
 
-		margin.top = 0;
-		margin.left = 0;
-		margin.bottom = 0;
-		margin.right = 0;
 		pplUploaded = true;
 
 		$('#ppl_preview').css("display", "block");
@@ -98,21 +117,26 @@ if (autoload) {
 	}
 
 	xpl.onload = function () {
-		xpl_preview_canvas.width = xpl.width;
-		xpl_preview_canvas.height = xpl.height;
+		originalSize = {
+			width: xpl.width,
+			height: xpl.height
+		};
+
+		if (customWidth) {
+			xpl.width = customWidth;
+			xpl.height = originalSize.height * (customWidth / originalSize.width);
+		}
+
+		xplPreviewCanvas.width = xpl.width;
+		xplPreviewCanvas.height = xpl.height;
 		xplCroppedCanvas.width = xpl.width;
 		xplCroppedCanvas.height = xpl.height;
-		xpl_results_canvas.width = xpl.width;
-		xpl_results_canvas.height = xpl.height;
+		xplResultsCanvas.width = xpl.width;
+		xplResultsCanvas.height = xpl.height;
 
-		xpl_preview_ctx.drawImage(xpl, 0, 0);
-		xpl_cropped_ctx.drawImage(xpl, 0, 0);
-		xpl_results_ctx.drawImage(xpl, 0, 0);
-
-		margin.top = 0;
-		margin.left = 0;
-		margin.bottom = 0;
-		margin.right = 0;
+		xplPreviewCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
+		xplCroppedCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
+		xplResultsCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
 
 		$('#xpl_preview').css("display", "block");
 		$('#xpl_upload_icon').css("display", "none");
@@ -120,27 +144,74 @@ if (autoload) {
 
 	ppl.src = autoload + 'ppl.png';
 	xpl.src = autoload + 'xpl.png';
+
+	if (!customWidth) {
+		switch (autoload) {
+			case 'test/48a/':
+				margin = {
+					top: 1100,
+					right: 450,
+					bottom: 500,
+					left: 280,
+					offsetX: -7,
+					offsetY: 2
+				}
+				break;
+			case 'test/48b/':
+				margin = {
+					top: 920,
+					right: 420,
+					bottom: 400,
+					left: 300,
+					offsetX: -5,
+					offsetY: 4
+				}
+				break;
+			case 'test/51a/':
+				margin = {
+					top: 1550,
+					right: 200,
+					bottom: 890,
+					left: 300,
+					offsetX: -5,
+					offsetY: 4
+				}
+				break;
+			case 'test/51b/':
+				margin = {
+					top: 870,
+					right: 340,
+					bottom: 390,
+					left: 400,
+					offsetX: -10,
+					offsetY: 5
+				}
+				break;
+		}
+	}
 }
 
 function pplHandleImage(e) {
 	ppl = new Image();
 
 	ppl.onload = function () {
-		ppl_preview_canvas.width = ppl.width;
-		ppl_preview_canvas.height = ppl.height;
+		pplPreviewCanvas.width = ppl.width;
+		pplPreviewCanvas.height = ppl.height;
 		pplCroppedCanvas.width = ppl.width;
 		pplCroppedCanvas.height = ppl.height;
-		ppl_results_canvas.width = ppl.width;
-		ppl_results_canvas.height = ppl.height;
+		pplResultsCanvas.width = ppl.width;
+		pplResultsCanvas.height = ppl.height;
 
-		ppl_preview_ctx.drawImage(ppl, 0, 0);
-		ppl_cropped_ctx.drawImage(ppl, 0, 0);
-		ppl_results_ctx.drawImage(ppl, 0, 0);
+		pplPreviewCtx.drawImage(ppl, 0, 0);
+		pplCroppedCtx.drawImage(ppl, 0, 0);
+		pplResultsCtx.drawImage(ppl, 0, 0);
 
-		margin.top = 0;
-		margin.left = 0;
-		margin.bottom = 0;
-		margin.right = 0;
+		margin = {
+			top: 0,
+			left: 0,
+			bottom: 0,
+			right: 0
+		};
 		pplUploaded = true;
 
 		$('#loading').css("display", "none");
@@ -166,21 +237,23 @@ function xplHandleImage(e) {
 	xpl.onload = function () {
 		if (pplUploaded) {
 			if (xpl.width == ppl.width && xpl.height == ppl.height) {
-				xpl_preview_canvas.width = xpl.width;
-				xpl_preview_canvas.height = xpl.height;
+				xplPreviewCanvas.width = xpl.width;
+				xplPreviewCanvas.height = xpl.height;
 				xplCroppedCanvas.width = xpl.width;
 				xplCroppedCanvas.height = xpl.height;
-				xpl_results_canvas.width = xpl.width;
-				xpl_results_canvas.height = xpl.height;
+				xplResultsCanvas.width = xpl.width;
+				xplResultsCanvas.height = xpl.height;
 
-				xpl_preview_ctx.drawImage(xpl, 0, 0);
-				xpl_cropped_ctx.drawImage(xpl, 0, 0);
-				xpl_results_ctx.drawImage(xpl, 0, 0);
+				xplPreviewCtx.drawImage(xpl, 0, 0);
+				xplCroppedCtx.drawImage(xpl, 0, 0);
+				xplResultsCtx.drawImage(xpl, 0, 0);
 
-				margin.top = 0;
-				margin.left = 0;
-				margin.bottom = 0;
-				margin.right = 0;
+				margin = {
+					top: 0,
+					left: 0,
+					bottom: 0,
+					right: 0
+				};
 
 				$('#xpl_preview').css("display", "block");
 				$('#xpl_upload_icon').css("display", "none");
@@ -207,32 +280,46 @@ function xplHandleImage(e) {
 
 function crop() {
 	if (margin.top = prompt("enter the top margin (in px)", margin.top)) {
-		if (margin.left = prompt("enter the left margin (in px)", margin.left)) {
+		if (margin.right = prompt("enter the right margin (in px)", margin.right)) {
 			if (margin.bottom = prompt("enter the bottom margin (in px)", margin.bottom)) {
-				if (margin.right = prompt("enter the right margin (in px)", margin.right)) {
-					var new_width = ppl_preview_canvas.width - margin.right - margin.left;
-					var new_height = ppl_preview_canvas.height - margin.bottom - margin.top;
+				if (margin.left = prompt("enter the left margin (in px)", margin.left)) {
+					if (margin.offsetX = prompt("enter the horizontal XPL offset (in px)", margin.offsetX)) {
+						if (margin.offsetY = prompt("enter the vertical XPL offset (in px)", margin.offsetY)) {
 
-					ppl_results_ctx.clearRect(0, 0, ppl_results_canvas.width, ppl_results_canvas.height);
-					xpl_results_ctx.clearRect(0, 0, xpl_results_canvas.width, xpl_results_canvas.height);
-					ppl_cropped_ctx.clearRect(0, 0, ppl_results_canvas.width, ppl_results_canvas.height);
-					xpl_cropped_ctx.clearRect(0, 0, xpl_results_canvas.width, xpl_results_canvas.height);
+							for (let k in margin) {
+								margin[k] = parseInt(margin[k]);
+							}
+ 
+							var width = pplPreviewCanvas.width - margin.right - margin.left;
+							var height = pplPreviewCanvas.height - margin.bottom - margin.top;
+							
+							pplResultsCtx.clearRect(0, 0, pplResultsCanvas.width, pplResultsCanvas.height);
+							xplResultsCtx.clearRect(0, 0, xplResultsCanvas.width, xplResultsCanvas.height);
 
-					ppl_results_canvas.width = new_width;
-					ppl_results_canvas.height = new_height;
-					xpl_results_canvas.width = new_width;
-					xpl_results_canvas.height = new_height;
-					ppl_cropped_canvas.width = new_width;
-					ppl_cropped_canvas.height = new_height;
-					xpl_cropped_canvas.width = new_width;
-					xpl_cropped_canvas.height = new_height;
+							pplCroppedCtx.clearRect(0, 0, pplResultsCanvas.width, pplResultsCanvas.height);
+							xplCroppedCtx.clearRect(0, 0, xplResultsCanvas.width, xplResultsCanvas.height);
 
-					ppl_cropped_ctx.drawImage(ppl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
-					xpl_cropped_ctx.drawImage(xpl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
-					ppl_results_ctx.drawImage(ppl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
-					xpl_results_ctx.drawImage(xpl, margin.left, margin.top, new_width, new_height, 0, 0, new_width, new_height);
+							pplResultsCanvas.width = width;
+							pplResultsCanvas.height = height;
 
-					//add_log("Cropped Region: "+new_width+" x "+new_height+" px");
+							xplResultsCanvas.width = width;
+							xplResultsCanvas.height = height;
+
+							pplCroppedCanvas.width = width;
+							pplCroppedCanvas.height = height;
+
+							xplCroppedCanvas.width = width;
+							xplCroppedCanvas.height = height;
+
+							pplCroppedCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
+							xplCroppedCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
+
+							pplResultsCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
+							xplResultsCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
+							
+							//add_log("Cropped Region: "+new_width+" x "+new_height+" px");
+						}
+					}
 				}
 			}
 		}
@@ -240,18 +327,33 @@ function crop() {
 }
 
 function start() {
+
 	$("#start_btn").prop('disabled',true);
 	$("#bottom-panel").fadeIn(200);
 
 	setObjectFromInputs(selectedObject);
 
-	imgDataPpl = ppl_cropped_ctx.getImageData(0, 0, pplCroppedCanvas.width, pplCroppedCanvas.height);
-	imgDataXpl = xpl_cropped_ctx.getImageData(0, 0, xplCroppedCanvas.width, xplCroppedCanvas.height);
+	imgDataPpl = pplCroppedCtx.getImageData(0, 0, pplCroppedCanvas.width, pplCroppedCanvas.height);
+	imgDataXpl = xplCroppedCtx.getImageData(0, 0, xplCroppedCanvas.width, xplCroppedCanvas.height);
 	totalPixels = pplCroppedCanvas.width * pplCroppedCanvas.height;
 
 	imgDataMaskAll = [];
 
 	let startObject = (onlySelected?selectedObject:1);
+
+	if (onlyFiltering) {
+		object = getObject(startObject);
+
+		validPixels[startObject] = 0;
+		filtered[startObject] = [];
+		comparisonValidPoints[startObject] = [];
+		filteredTrainingPoints[startObject] = [];
+
+		setTimeout(preFiltering, 1, startObject);
+		return;
+	}
+
+	//onlyFiltering = true;
 	
 	setTimeout(initialization, 1, startObject);
 }
@@ -262,34 +364,30 @@ function initialization(currentObject) {
 	validPixels[currentObject] = 0;
 	segments[currentObject] = [];
 	filtered[currentObject] = [];
-	comparisonValidPoints = [];
+	comparisonValidPoints[currentObject] = [];
+	filteredTrainingPoints[currentObject] = [];
 
 	imgDataMask = [];
 	imgDataMaskB = [];
 
-	stats[currentObject] = {
-		min_area: pplCroppedCanvas.width * pplCroppedCanvas.height,
-		max_area: 0,
-		min_compactness: 1,
-		max_compactness: 0,
-		min_convexity: 1,
-		max_convexity: 0,
-		min_aspect_ratio: 1,
-		max_aspect_ratio: 0,
-		min_major_axis_angle: 360,
-		max_major_axis_angle: -360
-	}
-
 	updateStatus(currentObject, "Comparing colors...", 0);
 
-	addLog("Initializing '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "): min area: " + object.min_area + ', max area: ' + object.max_area + ', min_compactness: ' + object.min_compactness + ', max_compactness: ' + object.max_compactness + ', min_convexity: ' + object.min_convexity + ', max_convexity: ' + object.max_convexity + ', min_aspect_ratio=' + object.min_aspect_ratio + ', max_aspect_ratio=' + object.max_aspect_ratio + ', min_major_axis_angle: ' + object.min_major_axis_angle + ', max_major_axis_angle: ' + object.max_major_axis_angle);
+	addLog("Initializing '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "): min area: " + object.min_area + ', max area: ' + object.max_area + ', min compactness: ' + object.min_compactness + ', max compactness: ' + object.max_compactness + ', min convexity: ' + object.min_convexity + ', max convexity: ' + object.max_convexity + ', min aspect ratio=' + object.min_aspect_ratio + ', max aspect ratio=' + object.max_aspect_ratio + ', min major axis angle: ' + object.min_major_axis_angle + ', max major axis angle: ' + object.max_major_axis_angle);
+
+	pplColorTargetLab = [];
+	xplColorTargetLab = [];
+	for (var i = 0; i < object.max_colors; i += 1) {
+		pplColorTargetLab[i] = rgb2lab(hexToRgb(object["ppl_color_target_" + (i + 1)]));
+		xplColorTargetLab[i] = rgb2lab(hexToRgb(object["xpl_color_target_" + (i + 1)]));
+	}
 	
 	var perc = 0;
-	percAdd = Math.floor(100 / (imgDataPpl.data.length / 50000000));
+	var step = 25000000;
+	percAdd = Math.floor(100 / (imgDataPpl.data.length / step));
 
-	for (var start = 0; start < imgDataPpl.data.length; start += 50000000) {
-		if (start + 50000000 < imgDataPpl.data.length)
-			var end = start + 50000000;
+	for (var start = 0; start < imgDataPpl.data.length; start += step) {
+		if (start + step < imgDataPpl.data.length)
+			var end = start + step;
 		else
 			var end = imgDataPpl.data.length;
 
@@ -304,18 +402,6 @@ function initialization(currentObject) {
 
 function comparison(currentObject, start, end, perc) {
 	var close, color1, color2;
-	var ppl_color_target_lab = [], xpl_color_target_lab = [];
-	var ppl_tollerance = [], xpl_tollerance = [];
-
-	for (var i = 0; i < object.max_colors; i += 1) {
-		var ppl_color_target_rgb = hexToRgb(object["ppl_color_target_" + (i + 1)]);
-		var xpl_color_target_rgb = hexToRgb(object["xpl_color_target_" + (i + 1)]);
-		ppl_color_target_lab[i] = rgb2lab(ppl_color_target_rgb);
-		xpl_color_target_lab[i] = rgb2lab(xpl_color_target_rgb);
-
-		ppl_tollerance[i] = object["ppl_tollerance_" + (i + 1)];
-		xpl_tollerance[i] = object["xpl_tollerance_" + (i + 1)];
-	}
 
 	for (var i = start; i < end; i += 4) {
 		if (typeof imgDataMaskAll[i / 4] == "undefined") {
@@ -336,9 +422,13 @@ function comparison(currentObject, start, end, perc) {
 
 			close = false;
 			for (var i2 = 0; i2 < object.max_colors; i2 += 1) {
-				const delta1 = deltaE(ppl_color_target_lab[i2], color1);
-				const delta2 = deltaE(xpl_color_target_lab[i2], color2);
-				if (ppl_tollerance[i2] >= delta1 && xpl_tollerance[i2] >= delta2)
+				let delta1 = deltaE(pplColorTargetLab[i2], color1);
+				let delta2 = deltaE(xplColorTargetLab[i2], color2);
+
+				let pplTollerance = object["ppl_tollerance_" + (i2 + 1)];
+				let xplTollerance = object["xpl_tollerance_" + (i2 + 1)];
+				
+				if (pplTollerance >= delta1 && xplTollerance >= delta2)
 					close = true;
 			}
 		} else {
@@ -347,7 +437,6 @@ function comparison(currentObject, start, end, perc) {
 
 		if (close) {
 			imgDataMask[i / 4] = true;
-			imgDataMaskAll[i / 4] = true;
 		} else {
 			imgDataMask[i / 4] = false;
 		}
@@ -366,11 +455,12 @@ function preSegmentation(currentObject) {
 	imgDataMaskB = imgDataMask.slice();
 
 	var perc = 0;
-	percAdd = Math.floor(100 / (pplCroppedCanvas.width / 1000));
+	var step = 1000;
+	percAdd = Math.floor(100 / (pplCroppedCanvas.width / step));
 
-	for (var start = 0; start <= pplCroppedCanvas.width; start += 1000) {
-		if (start + 1000 < pplCroppedCanvas.width)
-			var end = start + 1000;
+	for (var start = 0; start <= pplCroppedCanvas.width; start += step) {
+		if (start + step < pplCroppedCanvas.width)
+			var end = start + step;
 		else 
 			var end = pplCroppedCanvas.width;
 
@@ -406,7 +496,7 @@ function segmentation(currentObject, x_start, x_end, perc) {
 					reachLeft = false;
 					reachRight = false;
 					while (yy++ < pplCroppedCanvas.height - 1 && imgDataMask[pixelPos]) {
-						addPixel(pixelPos);
+						addPixel(pixelPos,xx,yy);
 
 						if (xx > 0) {
 							if (imgDataMask[pixelPos - 1]) {
@@ -455,11 +545,12 @@ function preFiltering(currentObject) {
 	updateStatus(currentObject, "Filtering...", 0);
 
 	var perc = 0;
-	percAdd = Math.floor(100 / (segments[currentObject].length / 1000));
+	var step = 500;
+	percAdd = Math.floor(100 / (segments[currentObject].length / step));
 
-	for (var start = 0; start <= segments[currentObject].length; start += 1000) {
-		if (start + 1000 < segments[currentObject].length)
-			var end = start + 1000;
+	for (var start = 0; start <= segments[currentObject].length; start += step) {
+		if (start + step < segments[currentObject].length)
+			var end = start + step;
 		else 
 			var end = segments[currentObject].length;
 
@@ -487,10 +578,10 @@ function filtering(currentObject, start, end, perc) {
 					var segment_convex_perimeter = 0;
 
 					for (var i = 0; i < convex_hull.length - 1; i++) {
-						segment_convex_perimeter += dist(convex_hull[i], convex_hull[i + 1]);
+						segment_convex_perimeter += getDistance(convex_hull[i], convex_hull[i + 1]);
 					}
 
-					segment_convex_perimeter += dist(convex_hull[0], convex_hull[convex_hull.length - 1]);
+					segment_convex_perimeter += getDistance(convex_hull[0], convex_hull[convex_hull.length - 1]);
 
 					var convexity = segment_convex_perimeter / segment.perimeterPixels.length;
 				}
@@ -498,32 +589,32 @@ function filtering(currentObject, start, end, perc) {
 				if (convexity >= object.min_convexity && convexity <= object.max_convexity) {
 
 					//calcolo asse maggiore
-					var major_axis = {};
-					major_axis.length = 0;
+					var majorAxis = {};
+					majorAxis.length = 0;
 					convex_hull.sort(sortfirst);
 					for (var i = 0; i < convex_hull.length; i += 1) {
 						var posXY1 = convex_hull[i];
 						for (var i2 = i; i2 < convex_hull.length; i2 += 1) {
 							var posXY2 = convex_hull[i2];
 							if (i !== i2) {
-								var length = dist(posXY1, posXY2);
-								if (length > major_axis.length) {
-									major_axis.length = length;
-									major_axis.x1 = posXY1[0];
-									major_axis.x2 = posXY2[0];
-									major_axis.y1 = posXY1[1];
-									major_axis.y2 = posXY2[1];
+								var length = getDistance(posXY1, posXY2);
+								if (length > majorAxis.length) {
+									majorAxis.length = length;
+									majorAxis.x1 = posXY1[0];
+									majorAxis.x2 = posXY2[0];
+									majorAxis.y1 = posXY1[1];
+									majorAxis.y2 = posXY2[1];
 								}
 							}
 						}
 					}
 
-					major_axis.angle = Math.atan2(-(major_axis.y2 - major_axis.y1), major_axis.x2 - major_axis.x1);
-					major_axis.angle = Math.round((major_axis.angle * 180) / Math.PI); //conversione in gradi
+					majorAxis.angle = Math.atan2(-(majorAxis.y2 - majorAxis.y1), majorAxis.x2 - majorAxis.x1);
+					majorAxis.angle = Math.round((majorAxis.angle * 180) / Math.PI); //conversione in gradi
 
 					//calcolo asse minore e baricentro
-					var minor_axis = {};
-					minor_axis.length = 0;
+					var minorAxis = {};
+					minorAxis.length = 0;
 					var sum_x = 0;
 					var sum_y = 0;
 					for (var i = 0; i < segment.perimeterPixels.length; i += 1) {
@@ -533,64 +624,45 @@ function filtering(currentObject, start, end, perc) {
 						for (var i2 = i; i2 < segment.perimeterPixels.length; i2 += 1) {
 							var posXY2 = segment.perimeterPixels[i2];
 							if (i !== i2) {
-								var length = dist(posXY1, posXY2);
-								if (length > minor_axis.length) {
-									minor_axis.angle = Math.atan2(-(posXY2[1] - posXY1[1]), posXY2[0] - posXY1[0]);
-									minor_axis.angle = Math.round((minor_axis.angle * 180) / Math.PI);
-									if (minor_axis.angle == major_axis.angle + 90 || minor_axis.angle == major_axis.angle - 90) {
-										minor_axis.length = length;
-										minor_axis.x1 = posXY1[0];
-										minor_axis.x2 = posXY2[0];
-										minor_axis.y1 = posXY1[1];
-										minor_axis.y2 = posXY2[1];
+								var length = getDistance(posXY1, posXY2);
+								if (length > minorAxis.length) {
+									minorAxis.angle = Math.atan2(-(posXY2[1] - posXY1[1]), posXY2[0] - posXY1[0]);
+									minorAxis.angle = Math.round((minorAxis.angle * 180) / Math.PI);
+									if (minorAxis.angle == majorAxis.angle + 90 || minorAxis.angle == majorAxis.angle - 90) {
+										minorAxis.length = length;
+										minorAxis.x1 = posXY1[0];
+										minorAxis.x2 = posXY2[0];
+										minorAxis.y1 = posXY1[1];
+										minorAxis.y2 = posXY2[1];
 									}
 								}
 							}
 						}
 					}
-					var aspect_ratio = minor_axis.length / major_axis.length;
+					var aspectRatio = minorAxis.length / majorAxis.length;
 
 					var centroid = {};
 					centroid.x = Math.round(sum_x / segment.perimeterPixels.length);
 					centroid.y = Math.round(sum_y / segment.perimeterPixels.length);
 					
-					if (major_axis.angle >= object.min_major_axis_angle && major_axis.angle <= object.max_major_axis_angle && aspect_ratio >= object.min_aspect_ratio && aspect_ratio <= object.max_aspect_ratio) {
-						if (area < stats[currentObject].min_area)
-							stats[currentObject].min_area = area;
-						if (area > stats[currentObject].max_area)
-							stats[currentObject].max_area = area;
-						if (compactness < stats[currentObject].min_compactness)
-							stats[currentObject].min_compactness = compactness;
-						if (compactness > stats[currentObject].max_compactness)
-							stats[currentObject].max_compactness = compactness;
-						if (convexity < stats[currentObject].min_convexity)
-							stats[currentObject].min_convexity = convexity;
-						if (convexity > stats[currentObject].max_convexity)
-							stats[currentObject].max_convexity = convexity;
-						if (aspect_ratio < stats[currentObject].min_aspect_ratio)
-							stats[currentObject].min_aspect_ratio = aspect_ratio;
-						if (aspect_ratio > stats[currentObject].max_aspect_ratio)
-							stats[currentObject].max_aspect_ratio = aspect_ratio;
-						if (major_axis.angle < stats[currentObject].min_major_axis_angle)
-							stats[currentObject].min_major_axis_angle = major_axis.angle;
-						if (major_axis.angle > stats[currentObject].max_major_axis_angle)
-							stats[currentObject].max_major_axis_angle = major_axis.angle;
+					if (majorAxis.angle >= object.min_major_axis_angle && majorAxis.angle <= object.max_major_axis_angle && aspectRatio >= object.min_aspect_ratio && aspectRatio <= object.max_aspect_ratio) {
 
-						filtered[currentObject].push(segmentIndex);
-
-						filteredExport.push({
-							id: object.obj_name + "_" + filteredExport.length,
+						filtered[currentObject].push({
+							id: object.obj_name + "_" + filtered[currentObject].length,
 							name: object.obj_name,
+							areaPixels: segment.areaPixels,
+							perimeterPixels: segment.perimeterPixels,
 							centroid: {
-								x: centroid.x + parseInt(margin.left),
-								y: centroid.y + parseInt(margin.top)
+								x: centroid.x + margin.left,
+								y: centroid.y + margin.top
 							},
 							stats: {
+								area,
 								compactness,
 								convexity,
-								aspectRatio: aspect_ratio,
-								minorAxisAngle: minor_axis.angle,
-								majorAxisAngle: major_axis.angle
+								aspectRatio,
+								minorAxisAngle: minorAxis.angle,
+								majorAxisAngle: majorAxis.angle
 							}
 						});
 
@@ -610,8 +682,9 @@ function filtering(currentObject, start, end, perc) {
 }
 
 function rendering(currentObject) {
+	/* RENDER */
 	for (var p = 0; p < filtered[currentObject].length; p += 1) {
-		var segment = segments[currentObject][filtered[currentObject][p]];
+		var segment = filtered[currentObject][p];
 
 		var renderColorRgb = hexToRgb(object.render_color);
 
@@ -623,6 +696,7 @@ function rendering(currentObject) {
 				var point = segment.areaPixels[i];
 				
 				var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
+				imgDataMaskAll[pos / 4] = true;
 
 				imgDataPpl.data[pos] = renderColorRgb.r;
 				imgDataPpl.data[pos + 1] = renderColorRgb.g;
@@ -631,7 +705,7 @@ function rendering(currentObject) {
 				imgDataXpl.data[pos + 1] = renderColorRgb.g;
 				imgDataXpl.data[pos + 2] = renderColorRgb.b;
 
-				if (comparisonPoints.some(e => e.name == object.obj_name && e.x == point[0] + parseInt(margin.left) && e.y == point[1] + parseInt(margin.top))) {
+				if (comparisonPoints.some(e => e.name == object.obj_name && e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
 					for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
 						var point = segment.areaPixels[ii];
 
@@ -646,7 +720,11 @@ function rendering(currentObject) {
 					}
 					i = segment.areaPixels.length;
 					
-					comparisonValidPoints.push([point[0], point[1]]);
+					comparisonValidPoints[currentObject].push([point[0], point[1]]);
+				}
+
+				if (trainingPoints.some(e => e.name == object.obj_name && e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
+					filteredTrainingPoints[currentObject].push(segment);
 				}
 			}
 		}
@@ -669,12 +747,50 @@ function rendering(currentObject) {
 
 	addLog("Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + ") completed: valid pixels: " + ((validPixels[currentObject] * 100) / totalPixels).toFixed(2) + "% (" + validPixels[currentObject] + " of " + totalPixels + " px), valid segments: " + filtered[currentObject].length);
 
+	if (filteredTrainingPoints[currentObject].length) {
+		filtered[currentObject] = filteredTrainingPoints[currentObject];
+	}
+
+	/* STATS */
 	if (filtered[currentObject].length > 0) {
-		addLog("Stats Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "): min_area: " + stats[currentObject].min_area + ", max_area: " + stats[currentObject].max_area + ", min_compactness: " + stats[currentObject].min_compactness.toFixed(2) + ", max_compactness: " + stats[currentObject].max_compactness.toFixed(2) + ", min_convexity: " + stats[currentObject].min_convexity.toFixed(2) + ", max_convexity: " + stats[currentObject].max_convexity.toFixed(2) + ", min_aspect_ratio: " + stats[currentObject].min_aspect_ratio + ", max_aspect_ratio: " + stats[currentObject].max_aspect_ratio + ", min_major_axis_angle: " + stats[currentObject].min_major_axis_angle + ", max_major_axis_angle: " + stats[currentObject].max_major_axis_angle);
+		stats[currentObject] = {};
+
+		statsProperties.forEach((statName) => {
+			var values = filtered[currentObject].map(a => math.round(a.stats[statName],2));
+
+			stats[currentObject][statName] = {
+				min: math.round(math.min(values),2),
+				max: math.round(math.max(values), 2),
+				mean: math.round(math.mean(values),2),
+				median: math.round(math.median(values), 2),
+				mode: math.round(math.mode(values), 2)
+			}
+		});
+
+		var logText = "Stats Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "):";
+
+		for (let statName in stats[currentObject]) {
+			logText += "<br>>> " + statName + ": ";
+			for (let property in stats[currentObject][statName]) {
+				logText += " " + property + ": " + stats[currentObject][statName][property];
+			}
+		}
+
+		addLog(logText);
 	}
 
 	if (comparisonPoints.length > 0) {
-		addLog("Object '" + object.obj_name + "' points comparision completed: valid points: " + comparisonValidPoints.length + "/" + comparisonPoints.length + '(' + ((comparisonValidPoints.length * 100) / comparisonPoints.length).toFixed(2) + " %), valid points on valid segments: " + comparisonValidPoints.length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints.length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
+		addLog("Object '" + object.obj_name + "' points comparison completed: valid points: " + comparisonValidPoints[currentObject].length + "/" + comparisonPoints.length + '(' + ((comparisonValidPoints[currentObject].length * 100) / comparisonPoints.length).toFixed(2) + " %), valid points on valid segments: " + comparisonValidPoints[currentObject].length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints[currentObject].length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
+	}
+
+	if (filteredTrainingPoints[currentObject].length) {
+		for (let statName in stats[currentObject]) {
+			var statNameS = statName.replace('aspectRatio', 'aspect_ratio').replace('majorAxisAngle', 'major_axis_angle');
+			$('#min_' + statNameS).val(stats[currentObject][statName].min);
+			$('#max_' + statNameS).val(stats[currentObject][statName].max);
+		}
+
+		addLog("Object '" + object.obj_name + "' trained");
 	}
 
 	setTimeout(print, 1);
@@ -687,6 +803,8 @@ function rendering(currentObject) {
 		} else
 			setTimeout(initialization, 1, currentObject + 1);
 	} else {
+		trainingPoints = [];
+
 		$("#start_btn").prop('disabled', false);
 		updateStatus(1, "Completed.", 100);
 	}
@@ -703,7 +821,8 @@ function hexToRgb(hex) {
 
 //Copyright (c) 2014 Kevin Kwok <antimatter15@gmail.com>
 function rgb2lab(color) {
-	const key = color.r + color.g + color.b;
+	let key = String(color.r) + String(color.g) + String(color.b);
+
 	if (typeof labColors[key] == 'undefined') {
 		var r = color.r / 255,
 		g = color.g / 255,
@@ -753,7 +872,6 @@ function deltaE(labA, labB) {
 	return i < 0 ? 0 : Math.sqrt(i);
 }
 
-/*
 function rgb2hsv (r, g, b) {
 	let rabs, gabs, babs, rr, gg, bb, h, s, v, diff, diffc, percentRoundFn;
 	rabs = r / 255;
@@ -789,11 +907,31 @@ function rgb2hsv (r, g, b) {
 		s: percentRoundFn(s * 100),
 		v: percentRoundFn(v * 100)
 	};
-}*/
+}
 
 function rgbToHex(r, g, b) {
 	return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
+
+function rgbToHsl(r, g, b) {
+	r /= 255;
+	g /= 255;
+	b /= 255;
+	const l = Math.max(r, g, b);
+	const s = l - Math.min(r, g, b);
+	const h = s
+		? l === r
+			? (g - b) / s
+			: l === g
+				? 2 + (b - r) / s
+				: 4 + (r - g) / s
+		: 0;
+	return [
+		60 * h < 0 ? 60 * h + 360 : 60 * h,
+		100 * (s ? (l <= 0.5 ? s / (2 * l - s) : s / (2 - (2 * l - s))) : 0),
+		(100 * (2 * l - s)) / 2,
+	];
+};
 
 function isClose(color1, color2, tollerance) {
 	var distance = Math.abs(color1.r - color2.r) + Math.abs(color1.g - color2.g) + Math.abs(color1.b - color2.b);
@@ -821,13 +959,13 @@ function updateStatus(currentObject, status, perc) {
 }
 
 function print() {
-	ppl_results_ctx.putImageData(imgDataPpl, 0, 0);
-	xpl_results_ctx.putImageData(imgDataXpl, 0, 0);
+	pplResultsCtx.putImageData(imgDataPpl, 0, 0);
+	xplResultsCtx.putImageData(imgDataXpl, 0, 0);
 }
 
-function addPixel(pixelPos) {
-	var x = (pixelPos) % pplCroppedCanvas.width;
-	var y = Math.floor((pixelPos) / pplCroppedCanvas.width);
+function addPixel(pixelPos,x,y) {
+	//var x = (pixelPos) % pplCroppedCanvas.width;
+	//var y = Math.floor((pixelPos) / pplCroppedCanvas.width);
 
 	imgDataMask[pixelPos] = false;
 
@@ -886,7 +1024,7 @@ function sortfirst(a, b) {
 	}
 }
 
-function dist(a, b) {
+function getDistance(a, b) {
 	return Math.sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]));
 }
 
@@ -894,8 +1032,8 @@ function cross(a, b, o) {
 	return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 }
 
+//https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain#JavaScript
 function convexHull(points) {
-	//https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain#JavaScript
 	points.sort(function (a, b) {
 		return a[0] == b[0] ? a[1] - b[1] : a[0] - b[0];
 	});
@@ -926,13 +1064,13 @@ function openPicker(mode, el) {
 		pickerColorN = $(el).parents('.color').attr('data-number');
 
 		if (mode == 1) {
-			pickerCanvas.width = ppl_preview_canvas.width;
-			pickerCanvas.height = ppl_preview_canvas.height;
+			pickerCanvas.width = pplPreviewCanvas.width;
+			pickerCanvas.height = pplPreviewCanvas.height;
 			pickerCanvasCtx.drawImage(ppl, 0, 0);
 		}
 		if (mode == 2) {
-			pickerCanvas.width = xpl_preview_canvas.width;
-			pickerCanvas.height = xpl_preview_canvas.height;
+			pickerCanvas.width = xplPreviewCanvas.width;
+			pickerCanvas.height = xplPreviewCanvas.height;
 			pickerCanvasCtx.drawImage(xpl, 0, 0);
 		}
 
@@ -943,35 +1081,30 @@ function openPicker(mode, el) {
 	}
 }
 
-function getSegment(event) {
-	var pos_x = event.clientX + Math.round(window.pageXOffset);
-	var pos_y = event.clientY + Math.round(window.pageYOffset);
+function setColorFromMouse(event) {
+	let x = event.clientX + Math.round(window.pageXOffset);
+	let y = event.clientY + Math.round(window.pageYOffset);
 
-	var imgDataPpl = ppl_preview_ctx.getImageData(0, 0, ppl_preview_canvas.width, ppl_preview_canvas.height);
-	var imgDataXpl = xpl_preview_ctx.getImageData(0, 0, ppl_preview_canvas.width, ppl_preview_canvas.height);
+	imgDataPpl = pplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+	imgDataXpl = xplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
 
-	var pixelPos = (pos_y * ppl_preview_canvas.width + pos_x) * 4;
-
-	var color_target1 = {
-		r: imgDataPpl.data[pixelPos],
-		g: imgDataPpl.data[pixelPos + 1],
-		b: imgDataPpl.data[pixelPos + 2]
-	};
-
-	var color_target2 = {
-		r: imgDataXpl.data[pixelPos],
-		g: imgDataXpl.data[pixelPos + 1],
-		b: imgDataXpl.data[pixelPos + 2]
-	}
-
-	var color1 = rgbToHex(color_target1.r, color_target1.g, color_target1.b);
-	var color2 = rgbToHex(color_target2.r, color_target2.g, color_target2.b);
-
-	$('#ppl_color_target_' + pickerColorN).val(color1);
-	$('#xpl_color_target_' + pickerColorN).val(color2);
+	$('#ppl_color_target_' + pickerColorN).val(getColorFromPosition(imgDataPpl, x, y));
+	$('#xpl_color_target_' + pickerColorN).val(getColorFromPosition(imgDataXpl, x, y));
 
 	$("#main-view").css('display', 'block');
 	$("#picker-view").css('display', 'none');
+}
+
+function getColorFromPosition(imgData,x,y) {
+	var pixelPos = (y * pplPreviewCanvas.width + x) * 4;
+
+	var color = {
+		r: imgData.data[pixelPos],
+		g: imgData.data[pixelPos + 1],
+		b: imgData.data[pixelPos + 2]
+	};
+
+	return rgbToHex(color.r, color.g, color.b);
 }
 
 function changeCanvas(m) {
@@ -987,11 +1120,10 @@ function changeCanvas(m) {
 
 function geojsonDownload() {
 	const download = document.getElementById("geojson_download");
+	var features = [];
 
-	if (filteredExport.length > 0) {
-		var features = [];
-
-		filteredExport.forEach(function (obj) {
+	filtered.forEach(function (segments) {
+		segments.forEach(function (obj) {
 			features.push({
 				type: "Feature", 
 				geometry: {
@@ -1007,15 +1139,16 @@ function geojsonDownload() {
 				}
 			});
 		});
+	});
 
-		const geojson = {
-			type: 'FeatureCollection',
-			features
-		};
+	const geojson = {
+		type: 'FeatureCollection',
+		features
+	};
 
-		const encodedUri = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson));
-		download.setAttribute("href", encodedUri);
-	}
+	const encodedUri = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson));
+	download.setAttribute("download", 'points_' + Date.now() + '.json');
+	download.setAttribute("href", encodedUri);
 }
 
 function pplDownload() {
@@ -1033,18 +1166,21 @@ function xplDownload() {
 function csvDownload() {
 	const download = document.getElementById("csv_download");
 
-	if (filteredExport.length > 0) {
-		var csvContent = '"id","object","x","y"\n';
+	var csvContent = '"id","object","x","y"\n';
+	var index = 0;
 
-		filteredExport.forEach(function (obj, index) {
+	filtered.forEach(function (segments) {
+		segments.forEach(function (obj) {
 			var dataString = '"' + obj.id + '","' + obj.name + '","' + obj.centroid.x + '","' + obj.centroid.y + '"';
 
-			csvContent += index < filteredExport.length - 1 ? dataString + '\n' : dataString;
+			csvContent += index < filtered.length - 1 ? dataString + '\n' : dataString;
+			index +=1;
 		});
+	});
 
-		const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURI(csvContent);
-		download.setAttribute("href", encodedUri);
-	}
+	const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURI(csvContent); 
+	download.setAttribute("download", 'objects_' + Date.now() + '.csv');
+	download.setAttribute("href", encodedUri);
 }
 
 function addColorBtn() {
@@ -1158,23 +1294,133 @@ function saveObj() {
 	setObjectFromInputs(selectedObject);
 	var download = document.getElementById("obj_download");
 	var data = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(objects));
+	download.setAttribute("download", 'objects_' + Date.now() +'.json');
 	download.setAttribute("href", data);
+}
+
+function importSegments(event) {
+	var file = event.target.files[0];
+	var columnName = 'descr', defaultTollerance = {ppl: 15, xpl: 15};
+
+	if (!file) {
+		return;
+	}
+
+	if (columnName = prompt('Insert object column name', columnName)) {
+		if (defaultTollerance.ppl = prompt('Insert default PPL tollerance', defaultTollerance.ppl)) {
+			if (defaultTollerance.xpl = prompt('Insert default XPL tollerance', defaultTollerance.xpl)) {
+				var reader = new FileReader();
+
+				reader.readAsText(file);
+				reader.onload = function (e) {
+					var points = [];
+
+					var json = JSON.parse(e.target.result);
+
+					json.features.forEach(function (feature) {
+						var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
+						var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
+
+						points.push({
+							name: feature.properties[columnName],
+							x,
+							y
+						});
+					});
+
+					if (confirm('Do you really want to import object names and colors? The current objects will be overwritten.')) {
+						trainingPoints = points;
+
+						var newObjects = {};
+
+						imgDataPpl = pplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+						imgDataXpl = xplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
+
+						points.forEach(function (object) {
+							var objectColor = {
+								ppl: getColorFromPosition(imgDataPpl, object.x, object.y),
+								xpl: getColorFromPosition(imgDataXpl, object.x, object.y)
+							};
+
+							if (typeof newObjects[object.name] == 'undefined') {
+								newObjects[object.name] = {
+									obj_name: object.name,
+									ppl_color_target_1: objectColor.ppl,
+									ppl_tollerance_1: defaultTollerance.ppl,
+									xpl_color_target_1: objectColor.xpl,
+									xpl_tollerance_1: defaultTollerance.xpl,
+									max_colors: 1,
+									render_color: '#' + Math.floor(Math.random() * 16777215).toString(16)
+								};
+							} else {
+								var close = false;
+								var objectColorLab = {
+									ppl: rgb2lab(hexToRgb(objectColor.ppl)),
+									xpl: rgb2lab(hexToRgb(objectColor.xpl))
+								};
+								
+								for (var i = 0; i < newObjects[object.name].max_colors; i += 1) {
+									var otherColor = {
+										ppl: rgb2lab(hexToRgb(newObjects[object.name]["ppl_color_target_" + (i + 1)])),
+										xpl: rgb2lab(hexToRgb(newObjects[object.name]["xpl_color_target_" + (i + 1)]))
+									}
+									var deltaPpl = deltaE(otherColor.ppl, objectColorLab.ppl);
+									var deltaXpl = deltaE(otherColor.xpl, objectColorLab.xpl);
+
+									if (defaultTollerance.ppl >= deltaPpl && defaultTollerance.xpl >= deltaXpl)
+										close = true;
+								}
+
+								if (!close) {
+									var colorIndex = newObjects[object.name].max_colors + 1;
+									newObjects[object.name].max_colors = colorIndex;
+									newObjects[object.name]['ppl_color_target_' + colorIndex] = objectColor.ppl;
+									newObjects[object.name]['xpl_color_target_' + colorIndex] = objectColor.xpl;
+									newObjects[object.name]['ppl_tollerance_' + colorIndex] = defaultTollerance.ppl;
+									newObjects[object.name]['xpl_tollerance_' + colorIndex] = defaultTollerance.xpl;
+								}
+							}
+						});
+
+						objects = [];
+						for (let i in newObjects) {
+							objects.push(newObjects[i]);
+						}
+
+						selectedObject = 1;
+						maxObjects = objects.length;
+
+						setInputsFromObject(selectedObject);
+
+						$("#obj_max,#obj_max_2").html(maxObjects);
+						$("#obj_selected").html(selectedObject);
+
+						if (maxObjects > 1) {
+							$("#next_obj,#remove_obj").css("opacity", "1");
+						}
+
+						alert(maxObjects + ' objects imported');
+					}
+				};
+			}
+		}
+	}
 }
 
 function importPoints(event) {
 	var file = event.target.files[0];
 	var columnName = '';
-	
+
 	if (!file) {
 		return;
 	}
 
-	if (columnName = prompt('Insert object name column', 'descr')) {
+	if (columnName = prompt('Insert object column name', 'descr')) {
 		var reader = new FileReader();
 
 		reader.readAsText(file);
 		reader.onload = function (e) {
-			comparisonPoints = [];
+			var points = [];
 
 			var json = JSON.parse(e.target.result);
 
@@ -1182,16 +1428,25 @@ function importPoints(event) {
 				var x = Math.abs(Math.round(feature.geometry.coordinates[0]));
 				var y = Math.abs(Math.round(feature.geometry.coordinates[1]));
 
-				comparisonPoints.push({
+				if (customWidth) {
+					x = Math.round(x * ((customWidth / originalSize.width)));
+					y = Math.round(y * ((customWidth / originalSize.width)));
+				}
+
+				points.push({
 					name: feature.properties[columnName],
 					x,
 					y
 				});
 			});
 
+			comparisonPoints = points;
+
 			alert(comparisonPoints.length + ' points imported');
 
-			$('#render_segment_color_container').slideDown(200);
+			if (comparisonPoints.length)
+				$('#render_segment_color_container').slideDown(200);
+
 		};
 	}
 }
@@ -1255,13 +1510,13 @@ function addObjBtn() {
 		ppl_tollerance_1: '15',
 		xpl_tollerance_1: '15',
 		max_colors: 1,
-		min_area: 5,
+		min_area: 10,
 		max_area: 100000,
 		min_compactness: 0,
 		max_compactness: 1,
 		min_convexity: 0,
 		max_convexity: 1,
-		min_aspect_ratio: 0,
+		min_aspectRatio: 0,
 		max_aspect_ratio: 1,
 		min_major_axis_angle: -90,
 		max_major_axis_angle: 90,

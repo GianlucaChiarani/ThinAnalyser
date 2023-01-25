@@ -21,7 +21,7 @@
 								title="Upload objects"></i>
 						</div>
 						<div class="btn btn-sm text-light">
-							<a id="obj_download" download="objects.json">
+							<a id="obj_download">
 								<i class="fa fa-save" onclick="saveObj();" title="Save objects"></i>
 							</a>
 						</div>
@@ -39,6 +39,7 @@
 			</div>
 			<div id="left-panel" class="col bg-light shadow">
 				<input style="display: none;" type="file" accept=".json" id="obj_loader" />
+				<input style="display: none;" type="file" accept=".geojson" id="segments_loader" />
 				<input style="display: none;" type="file" accept=".geojson" id="points_loader" />
 				<div id="navigation" class="row bg-blur position-sticky align-items-center g-2 py-3">
 					<div class="col-12">
@@ -103,7 +104,7 @@
 							<label class="form-label">Net Area</label>
 							<div class="row g-1">
 								<div class="col-auto d-flex align-items-center">Min</div>
-								<div class="col"><input id="min_area" class="form-control" type="number" value="5" min="1" /></div>
+								<div class="col"><input id="min_area" class="form-control" type="number" value="10" min="1" /></div>
 								<div class="col-auto d-flex align-items-center">Max</div>
 								<div class="col"><input id="max_area" class="form-control" type="number" value="100000" /></div>
 							</div>
@@ -173,10 +174,18 @@
 							<div class="btn btn-secondary w-100" onclick="crop();"><i class="fa fa-cut"></i></div>
 						</div>
 						<div class="col">
-							<div class="btn btn-secondary w-100"  onclick="document.getElementById('points_loader').click();"><i class="fas fa-file-import"></i></div>
+							<div class="dropdown d-inline-block w-100">
+								<div class="btn btn-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown"><i class="fas fa-file-import"></i></div>
+								<ul class="dropdown-menu dropdown-menu-start">
+									<li><a id="ppl_download" download="ppl_results.png" class="dropdown-item" onclick="document.getElementById('segments_loader').click();"
+											href="javascript:">Import objects</a></li>
+									<li><a id="xpl_download" download="xpl_results.png" class="dropdown-item" onclick="document.getElementById('points_loader').click();"
+											href="javascript:">Import points</a></li>
+								</ul>
+							</div>
 						</div>
 						<div class="col">
-							<div class="dropdown d-inline-block">
+							<div class="dropdown d-inline-block w-100">
 								<div class="btn btn-secondary w-100 dropdown-toggle" data-bs-toggle="dropdown"><i class="fa fa-download"></i></div>
 								<ul class="dropdown-menu dropdown-menu-start">
 									<li><a id="ppl_download" download="ppl_results.png" class="dropdown-item" onclick="pplDownload()"
@@ -185,10 +194,10 @@
 									<li><a id="xpl_download" download="xpl_results.png" class="dropdown-item" onclick="xplDownload()"
 											href="javascript:">Download
 											XPL</a></li>
-									<li><a id="csv_download" download="points.csv" class="dropdown-item" onclick="csvDownload()"
+									<li><a id="csv_download" class="dropdown-item" onclick="csvDownload()"
 											href="javascript:">Download
 											CSV</a></li>
-									<li><a id="geojson_download" download="points.json" class="dropdown-item" onclick="geojsonDownload()"
+									<li><a id="geojson_download" class="dropdown-item" onclick="geojsonDownload()"
 											href="javascript:">Download
 											GeoJson</a></li>
 								</ul>
@@ -261,18 +270,19 @@
 	</div>
 
 	<div id="picker-view">
-		<canvas id="picker-canvas" onclick="getSegment(event);"></canvas>
+		<canvas id="picker-canvas" onclick="setColorFromMouse(event);"></canvas>
 	</div>
 
 	<div class="loading" id="loading">Loading&#8230;</div>
 
 	<div class="p-3 d-none">
-		<div style="font-size: 18px;">Thin Analyser v. 1.0</div>
+		<div style="font-size: 18px;">Thin Analyser v. 1.3</div>
 		<div>&copy; 2020-2022, <a href="mailto:gianluca.chiarani@gmail.com"></a>Gianluca Chiarani</a>. GNU General Public License (GPL)</div>
 	</div>
 
 	<script type="text/javascript" src="js/jquery.js"></script>
 	<script type="text/javascript" src="js/bootstrap.js"></script>
+	<script type="text/javascript" src="js/math.js"></script>
 	<script type="text/javascript" src="js/core.js"></script>
 </body>
 
