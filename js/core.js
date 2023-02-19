@@ -1,5 +1,5 @@
 /* 
-	Thin-analyser image processor v. 1.3
+	Thin-analyser image processor v. 1.5
 	Copyright (c) 2020-2022 Gianluca Chiarani <gianluca.chiarani@gmail.com>
 	GNU General Public License (GPL)
 */
@@ -83,67 +83,9 @@ $('#obj_loader').on('change', loadObj);
 $('#segments_loader').on('change', importSegments);
 $('#points_loader').on('change', importPoints);
 
-var autoload = 'test/48a/';
+/* TO DELETE */
+var autoload = 'test/48b/';
 if (autoload) {
-	ppl = new Image();
-	xpl = new Image();
-
-	ppl.onload = function () {
-		originalSize = {
-			width: ppl.width,
-			height: ppl.height
-		};
-
-		if (customWidth) {
-			ppl.width = customWidth;
-			ppl.height = originalSize.height * (customWidth / originalSize.width);
-		}
-
-		pplPreviewCanvas.width = ppl.width;
-		pplPreviewCanvas.height = ppl.height;
-		pplCroppedCanvas.width = ppl.width;
-		pplCroppedCanvas.height = ppl.height;
-		pplResultsCanvas.width = ppl.width;
-		pplResultsCanvas.height = ppl.height;
-
-		pplPreviewCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
-		pplCroppedCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
-		pplResultsCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
-
-		pplUploaded = true;
-
-		$('#ppl_preview').css("display", "block");
-		$('#ppl_upload_icon').css("display", "none");
-	}
-
-	xpl.onload = function () {
-		originalSize = {
-			width: xpl.width,
-			height: xpl.height
-		};
-
-		if (customWidth) {
-			xpl.width = customWidth;
-			xpl.height = originalSize.height * (customWidth / originalSize.width);
-		}
-
-		xplPreviewCanvas.width = xpl.width;
-		xplPreviewCanvas.height = xpl.height;
-		xplCroppedCanvas.width = xpl.width;
-		xplCroppedCanvas.height = xpl.height;
-		xplResultsCanvas.width = xpl.width;
-		xplResultsCanvas.height = xpl.height;
-
-		xplPreviewCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
-		xplCroppedCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
-		xplResultsCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
-
-		$('#xpl_preview').css("display", "block");
-		$('#xpl_upload_icon').css("display", "none");
-	}
-
-	ppl.src = autoload + 'ppl.png';
-	xpl.src = autoload + 'xpl.png';
 
 	if (!customWidth) {
 		switch (autoload) {
@@ -189,7 +131,93 @@ if (autoload) {
 				break;
 		}
 	}
+
+	ppl = new Image();
+	xpl = new Image();
+
+	ppl.onload = function () {
+		originalSize = {
+			width: ppl.width,
+			height: ppl.height
+		};
+
+		if (customWidth) {
+			ppl.width = customWidth;
+			ppl.height = originalSize.height * (customWidth / originalSize.width);
+		}
+
+		pplPreviewCanvas.width = ppl.width;
+		pplPreviewCanvas.height = ppl.height;
+		pplCroppedCanvas.width = ppl.width;
+		pplCroppedCanvas.height = ppl.height;
+		pplResultsCanvas.width = ppl.width;
+		pplResultsCanvas.height = ppl.height;
+
+		pplPreviewCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
+		
+		var width = ppl.width - margin.right - margin.left;
+		var height = ppl.height - margin.bottom - margin.top;
+
+		pplResultsCanvas.width = width;
+		pplResultsCanvas.height = height;
+
+		pplCroppedCanvas.width = width;
+		pplCroppedCanvas.height = height;
+
+		pplCroppedCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
+
+		pplResultsCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
+
+		pplUploaded = true;
+
+		$('#ppl_preview').css("display", "block");
+		$('#ppl_upload_icon').css("display", "none");
+	}
+
+	xpl.onload = function () {
+		originalSize = {
+			width: xpl.width,
+			height: xpl.height
+		};
+
+		if (customWidth) {
+			xpl.width = customWidth;
+			xpl.height = originalSize.height * (customWidth / originalSize.width);
+		}
+
+		xplPreviewCanvas.width = xpl.width;
+		xplPreviewCanvas.height = xpl.height;
+		xplCroppedCanvas.width = xpl.width;
+		xplCroppedCanvas.height = xpl.height;
+		xplResultsCanvas.width = xpl.width;
+		xplResultsCanvas.height = xpl.height;
+
+		xplPreviewCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
+
+		var width = xpl.width - margin.right - margin.left;
+		var height = ppl.height - margin.bottom - margin.top;
+
+		xplResultsCanvas.width = width;
+		xplResultsCanvas.height = height;
+
+		xplCroppedCanvas.width = width;
+		xplCroppedCanvas.height = height;
+
+		xplCroppedCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
+
+		xplResultsCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
+
+		$('#xpl_preview').css("display", "block");
+		$('#xpl_upload_icon').css("display", "none");
+	}
+
+	ppl.src = autoload + 'ppl.png';
+	xpl.src = autoload + 'xpl.png';
 }
+
+document.getElementById("start_btn").onclick = event => {
+	start();
+};
 
 function pplHandleImage(e) {
 	ppl = new Image();
@@ -583,20 +611,20 @@ function filtering(currentObject, start, end, perc) {
 			
 			if (compactness >= object.min_compactness && compactness <= object.max_compactness) {
 				//calcolo perimetro convesso
-				var convex_hull = convexHull(segment.perimeterPixels);
+				var convexHull = getConvexHull(segment.perimeterPixels);
 
-				if (convex_hull == false) {
+				if (convexHull == false) {
 					var convexity = 999;
 				} else {
-					var segment_convex_perimeter = 0;
+					var segmentConvexPerimeter = 0;
 
-					for (var i = 0; i < convex_hull.length - 1; i++) {
-						segment_convex_perimeter += getDistance(convex_hull[i], convex_hull[i + 1]);
+					for (var i = 0; i < convexHull.length - 1; i++) {
+						segmentConvexPerimeter += getDistance(convexHull[i], convexHull[i + 1]);
 					}
 
-					segment_convex_perimeter += getDistance(convex_hull[0], convex_hull[convex_hull.length - 1]);
+					segmentConvexPerimeter += getDistance(convexHull[0], convexHull[convexHull.length - 1]);
 
-					var convexity = segment_convex_perimeter / segment.perimeterPixels.length;
+					var convexity = segmentConvexPerimeter / segment.perimeterPixels.length;
 				}
 
 				if (convexity >= object.min_convexity && convexity <= object.max_convexity) {
@@ -604,11 +632,11 @@ function filtering(currentObject, start, end, perc) {
 					//calcolo asse maggiore
 					var majorAxis = {};
 					majorAxis.length = 0;
-					convex_hull.sort(sortfirst);
-					for (var i = 0; i < convex_hull.length; i += 1) {
-						var posXY1 = convex_hull[i];
-						for (var i2 = i; i2 < convex_hull.length; i2 += 1) {
-							var posXY2 = convex_hull[i2];
+					convexHull.sort(sortfirst);
+					for (var i = 0; i < convexHull.length; i += 1) {
+						var posXY1 = convexHull[i];
+						for (var i2 = i; i2 < convexHull.length; i2 += 1) {
+							var posXY2 = convexHull[i2];
 							if (i !== i2) {
 								var length = getDistance(posXY1, posXY2);
 								if (length > majorAxis.length) {
@@ -696,13 +724,18 @@ function filtering(currentObject, start, end, perc) {
 
 function rendering(currentObject) {
 	/* RENDER */
+
+	if (comparisonPoints.length > 0) {
+		var renderSegmentColorRgb = hexToRgb(object.render_segment_color);
+		var comparisonObjectPoints = comparisonPoints.filter(point => point.name == object.obj_name);
+	} else {
+		var comparisonObjectPoints = [];
+	}
+	
+	var renderColorRgb = hexToRgb(object.render_color);
+
 	for (var p = 0; p < filtered[currentObject].length; p += 1) {
 		var segment = filtered[currentObject][p];
-
-		var renderColorRgb = hexToRgb(object.render_color);
-
-		if (comparisonPoints.length > 0)
-			var renderSegmentColorRgb = hexToRgb(object.render_segment_color);
 
 		if (object.render_mode == "fill") {
 			for (var i = 0; i < segment.areaPixels.length; i += 1) {
@@ -718,8 +751,8 @@ function rendering(currentObject) {
 				imgDataXpl.data[pos + 1] = renderColorRgb.g;
 				imgDataXpl.data[pos + 2] = renderColorRgb.b;
 
-				if (comparisonPoints.some(e => e.name == object.obj_name && e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
-					for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
+				if (comparisonObjectPoints.some(e => e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
+					/* for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
 						var point = segment.areaPixels[ii];
 
 						var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
@@ -731,12 +764,12 @@ function rendering(currentObject) {
 						imgDataXpl.data[pos + 1] = renderSegmentColorRgb.g;
 						imgDataXpl.data[pos + 2] = renderSegmentColorRgb.b;
 					}
-					i = segment.areaPixels.length;
+					i = segment.areaPixels.length; */
 					
 					comparisonValidPoints[currentObject].push([point[0], point[1]]);
 				}
 
-				if (trainingPoints.some(e => e.name == object.obj_name && e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
+				if (trainingPoints.some(e => e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
 					filteredTrainingPoints[currentObject].push(segment);
 				}
 			}
@@ -757,12 +790,12 @@ function rendering(currentObject) {
 			}
 		}
 	}
-
-	addLog("Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + ") completed: valid pixels: " + ((validPixels[currentObject] * 100) / totalPixels).toFixed(2) + "% (" + validPixels[currentObject] + " of " + totalPixels + " px), valid segments: " + filtered[currentObject].length);
-
+	
 	if (filteredTrainingPoints[currentObject].length) {
 		filtered[currentObject] = filteredTrainingPoints[currentObject];
 	}
+
+	addLog("Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + ") completed: valid pixels: " + ((validPixels[currentObject] * 100) / totalPixels).toFixed(2) + "% (" + validPixels[currentObject] + " of " + totalPixels + " px), valid segments: " + filtered[currentObject].length);
 
 	/* STATS */
 	if (filtered[currentObject].length > 0) {
@@ -792,8 +825,8 @@ function rendering(currentObject) {
 		addLog(logText);
 	}
 
-	if (comparisonPoints.length > 0) {
-		addLog("Object '" + object.obj_name + "' points comparison completed: valid points: " + comparisonValidPoints[currentObject].length + "/" + comparisonPoints.length + '(' + ((comparisonValidPoints[currentObject].length * 100) / comparisonPoints.length).toFixed(2) + " %), valid points on valid segments: " + comparisonValidPoints[currentObject].length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints[currentObject].length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
+	if (comparisonObjectPoints.length > 0) {
+		addLog("Object '" + object.obj_name + "' points comparison completed: valid points: " + comparisonValidPoints[currentObject].length + "/" + comparisonObjectPoints.length + '(' + ((comparisonValidPoints[currentObject].length * 100) / comparisonObjectPoints.length).toFixed(2) + " %), valid points on valid segments: " + comparisonValidPoints[currentObject].length + "/" + filtered[currentObject].length + '(' + ((comparisonValidPoints[currentObject].length * 100) / filtered[currentObject].length).toFixed(2) + " %)");
 	}
 
 	if (filteredTrainingPoints[currentObject].length) {
@@ -821,6 +854,14 @@ function rendering(currentObject) {
 		$("#start_btn").prop('disabled', false);
 		updateStatus(1, "Completed.", 100);
 	}
+}
+
+function print() {
+	pplResultsCtx.putImageData(imgDataPpl, 0, 0);
+	xplResultsCtx.putImageData(imgDataXpl, 0, 0);
+
+	/* if (comparisonPoints.length)
+		drawPoints(comparisonPoints, object.render_segment_color); */
 }
 
 function hexToRgb(hex) {
@@ -971,11 +1012,6 @@ function updateStatus(currentObject, status, perc) {
 	$("#obj_current").html(currentObject);
 }
 
-function print() {
-	pplResultsCtx.putImageData(imgDataPpl, 0, 0);
-	xplResultsCtx.putImageData(imgDataXpl, 0, 0);
-}
-
 function addPixel(pixelPos,x,y) {
 	//var x = (pixelPos) % pplCroppedCanvas.width;
 	//var y = Math.floor((pixelPos) / pplCroppedCanvas.width);
@@ -1045,8 +1081,8 @@ function cross(a, b, o) {
 	return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 }
 
-//https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain#JavaScript
-function convexHull(points) {
+//https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/convexHull/Monotone_chain#JavaScript
+function getConvexHull(points) {
 	points.sort(function (a, b) {
 		return a[0] == b[0] ? a[1] - b[1] : a[0] - b[0];
 	});
@@ -1143,7 +1179,7 @@ function geojsonDownload() {
 					type: "Point", 
 					coordinates: [
 						obj.centroid.x,
-						obj.centroid.y
+						(-obj.centroid.y)
 					]
 				},
 				properties: {
@@ -1179,19 +1215,17 @@ function xplDownload() {
 function csvDownload() {
 	const download = document.getElementById("csv_download");
 
-	var csvContent = '"id","object","x","y"\n';
-	var index = 0;
+	var csvContent = ['"id","object","x","y","' + statsProperties.join('","')+'"'];
 
 	filtered.forEach(function (segments) {
 		segments.forEach(function (obj) {
-			var dataString = '"' + obj.id + '","' + obj.name + '","' + obj.centroid.x + '","' + obj.centroid.y + '"';
-
-			csvContent += index < filtered.length - 1 ? dataString + '\n' : dataString;
-			index +=1;
+			var dataString = '"' + obj.id + '","' + obj.name + '","' + obj.centroid.x + '","' + obj.centroid.y + '","' + obj.stats.area + '","' + obj.stats.compactness + '","' + obj.stats.convexity + '","' + obj.stats.aspectRatio + '","' + obj.stats.majorAxisAngle + '"';
+			
+			csvContent.push(dataString);
 		});
 	});
 
-	const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURI(csvContent); 
+	const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURI(csvContent.join("\n")); 
 	download.setAttribute("download", 'objects_' + Date.now() + '.csv');
 	download.setAttribute("href", encodedUri);
 }
@@ -1347,8 +1381,8 @@ function importSegments(event) {
 
 							points.push({
 								name: feature.properties[columnName],
-								x: x + margin.left,
-								y: y + margin.top
+								x: x,
+								y: y
 							});
 						});
 
@@ -1362,6 +1396,9 @@ function importSegments(event) {
 								imgDataXpl = xplPreviewCtx.getImageData(0, 0, pplPreviewCanvas.width, pplPreviewCanvas.height);
 
 								points.forEach(function (object) {
+									object.x += margin.left;
+									object.y += margin.top;
+
 									var objectColor = {
 										ppl: getColorFromPosition(imgDataPpl, object.x, object.y),
 										xpl: getColorFromPosition(imgDataXpl, object.x, object.y)
@@ -1472,6 +1509,8 @@ function importPoints(event) {
 					});
 
 					comparisonPoints = points;
+
+					drawPoints(comparisonPoints);
 
 					bootbox.alert(comparisonPoints.length + ' points imported');
 
@@ -1588,4 +1627,20 @@ function deleteObjBtn() {
 		$("#obj_selected").html(selectedObject);
 		$("#obj_max,#obj_max_2").html(maxObjects);
 	}
+}
+
+function drawPoints(points, color = 'red') {
+	points.forEach(function (point) {
+		pplResultsCtx.beginPath();
+		pplResultsCtx.arc(point.x - margin.left, point.y - margin.top, 5, 0, 2 * Math.PI, true);
+		pplResultsCtx.fillStyle = color;
+		pplResultsCtx.fill();
+		pplResultsCtx.stroke();
+
+		xplResultsCtx.beginPath();
+		xplResultsCtx.arc(point.x - margin.left, point.y - margin.top, 5, 0, 2 * Math.PI, true);
+		xplResultsCtx.fillStyle = color;
+		xplResultsCtx.fill();
+		xplResultsCtx.stroke();
+	});
 }
