@@ -1,8 +1,9 @@
-/* 
-	Thin-analyser image processor v. 1.5
-	Copyright (c) 2020-2022 Gianluca Chiarani <gianluca.chiarani@gmail.com>
-	GNU General Public License (GPL)
-*/
+/**
+ * ThinAnalyser (https://github.com/GianlucaChiarani/ThinAnalyser)
+ * @version 1.3
+ * @author Gianluca Chiarani
+ * @license GNU General Public License (GPL)
+ */
 
 "use strict";
 
@@ -82,138 +83,6 @@ $('#xpl_loader').on('change', xplHandleImage);
 $('#obj_loader').on('change', loadObj);
 $('#segments_loader').on('change', importSegments);
 $('#points_loader').on('change', importPoints);
-
-/* TO DELETE */
-var autoload = 'test/48b/';
-if (autoload) {
-
-	if (!customWidth) {
-		switch (autoload) {
-			case 'test/48a/':
-				margin = {
-					top: 1100,
-					right: 450,
-					bottom: 500,
-					left: 280,
-					offsetX: -7,
-					offsetY: 2
-				}
-				break;
-			case 'test/48b/':
-				margin = {
-					top: 920,
-					right: 420,
-					bottom: 400,
-					left: 300,
-					offsetX: -5,
-					offsetY: 4
-				}
-				break;
-			case 'test/51a/':
-				margin = {
-					top: 1550,
-					right: 200,
-					bottom: 890,
-					left: 300,
-					offsetX: -5,
-					offsetY: 4
-				}
-				break;
-			case 'test/51b/':
-				margin = {
-					top: 870,
-					right: 340,
-					bottom: 390,
-					left: 400,
-					offsetX: -10,
-					offsetY: 5
-				}
-				break;
-		}
-	}
-
-	ppl = new Image();
-	xpl = new Image();
-
-	ppl.onload = function () {
-		originalSize = {
-			width: ppl.width,
-			height: ppl.height
-		};
-
-		if (customWidth) {
-			ppl.width = customWidth;
-			ppl.height = originalSize.height * (customWidth / originalSize.width);
-		}
-
-		pplPreviewCanvas.width = ppl.width;
-		pplPreviewCanvas.height = ppl.height;
-		pplCroppedCanvas.width = ppl.width;
-		pplCroppedCanvas.height = ppl.height;
-		pplResultsCanvas.width = ppl.width;
-		pplResultsCanvas.height = ppl.height;
-
-		pplPreviewCtx.drawImage(ppl, 0, 0, ppl.width, ppl.height);
-		
-		var width = ppl.width - margin.right - margin.left;
-		var height = ppl.height - margin.bottom - margin.top;
-
-		pplResultsCanvas.width = width;
-		pplResultsCanvas.height = height;
-
-		pplCroppedCanvas.width = width;
-		pplCroppedCanvas.height = height;
-
-		pplCroppedCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
-
-		pplResultsCtx.drawImage(ppl, margin.left, margin.top, width, height, 0, 0, width, height);
-
-		pplUploaded = true;
-
-		$('#ppl_preview').css("display", "block");
-		$('#ppl_upload_icon').css("display", "none");
-	}
-
-	xpl.onload = function () {
-		originalSize = {
-			width: xpl.width,
-			height: xpl.height
-		};
-
-		if (customWidth) {
-			xpl.width = customWidth;
-			xpl.height = originalSize.height * (customWidth / originalSize.width);
-		}
-
-		xplPreviewCanvas.width = xpl.width;
-		xplPreviewCanvas.height = xpl.height;
-		xplCroppedCanvas.width = xpl.width;
-		xplCroppedCanvas.height = xpl.height;
-		xplResultsCanvas.width = xpl.width;
-		xplResultsCanvas.height = xpl.height;
-
-		xplPreviewCtx.drawImage(xpl, 0, 0, xpl.width, xpl.height);
-
-		var width = xpl.width - margin.right - margin.left;
-		var height = ppl.height - margin.bottom - margin.top;
-
-		xplResultsCanvas.width = width;
-		xplResultsCanvas.height = height;
-
-		xplCroppedCanvas.width = width;
-		xplCroppedCanvas.height = height;
-
-		xplCroppedCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
-
-		xplResultsCtx.drawImage(xpl, margin.left + margin.offsetX, margin.top + margin.offsetY, width, height, 0, 0, width, height);
-
-		$('#xpl_preview').css("display", "block");
-		$('#xpl_upload_icon').css("display", "none");
-	}
-
-	ppl.src = autoload + 'ppl.png';
-	xpl.src = autoload + 'xpl.png';
-}
 
 document.getElementById("start_btn").onclick = event => {
 	start();
@@ -393,8 +262,6 @@ function start() {
 		setTimeout(preFiltering, 1, startObject);
 		return;
 	}
-
-	//onlyFiltering = true;
 	
 	setTimeout(initialization, 1, startObject);
 }
@@ -651,7 +518,9 @@ function filtering(currentObject, start, end, perc) {
 					}
 
 					majorAxis.angle = Math.atan2(-(majorAxis.y2 - majorAxis.y1), majorAxis.x2 - majorAxis.x1);
-					majorAxis.angle = Math.round((majorAxis.angle * 180) / Math.PI); //conversione in gradi
+					
+					//conversione in gradi
+					majorAxis.angle = Math.round((majorAxis.angle * 180) / Math.PI); 
 
 					//calcolo asse minore e baricentro
 					var minorAxis = {};
@@ -752,7 +621,7 @@ function rendering(currentObject) {
 				imgDataXpl.data[pos + 2] = renderColorRgb.b;
 
 				if (comparisonObjectPoints.some(e => e.x == point[0] + margin.left && e.y == point[1] + margin.top)) {
-					/* for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
+					for (var ii = 0; ii < segment.areaPixels.length; ii += 1) {
 						var point = segment.areaPixels[ii];
 
 						var pos = point[1] * (pplCroppedCanvas.width * 4) + (point[0] * 4);
@@ -764,7 +633,7 @@ function rendering(currentObject) {
 						imgDataXpl.data[pos + 1] = renderSegmentColorRgb.g;
 						imgDataXpl.data[pos + 2] = renderSegmentColorRgb.b;
 					}
-					i = segment.areaPixels.length; */
+					i = segment.areaPixels.length;
 					
 					comparisonValidPoints[currentObject].push([point[0], point[1]]);
 				}
@@ -1013,9 +882,6 @@ function updateStatus(currentObject, status, perc) {
 }
 
 function addPixel(pixelPos,x,y) {
-	//var x = (pixelPos) % pplCroppedCanvas.width;
-	//var y = Math.floor((pixelPos) / pplCroppedCanvas.width);
-
 	imgDataMask[pixelPos] = false;
 
 	segmentAreaPixels.push([x, y]);
@@ -1081,7 +947,6 @@ function cross(a, b, o) {
 	return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 }
 
-//https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/convexHull/Monotone_chain#JavaScript
 function getConvexHull(points) {
 	points.sort(function (a, b) {
 		return a[0] == b[0] ? a[1] - b[1] : a[0] - b[0];
