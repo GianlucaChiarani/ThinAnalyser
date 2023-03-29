@@ -1,6 +1,6 @@
 /**
  * ThinAnalyser (https://github.com/GianlucaChiarani/ThinAnalyser)
- * @version 1.3
+ * @version 1.3.0
  * @author Gianluca Chiarani
  * @license GNU General Public License (GPL)
  */
@@ -107,7 +107,9 @@ function pplHandleImage(e) {
 			top: 0,
 			left: 0,
 			bottom: 0,
-			right: 0
+			right: 0,
+			offsetX: 0,
+			offsetY: 0
 		};
 		pplUploaded = true;
 
@@ -149,7 +151,9 @@ function xplHandleImage(e) {
 					top: 0,
 					left: 0,
 					bottom: 0,
-					right: 0
+					right: 0,
+					offsetX: 0,
+					offsetY: 0
 				};
 
 				$('#xpl_preview').css("display", "block");
@@ -239,7 +243,7 @@ function crop() {
 function start() {
 
 	$("#start_btn").prop('disabled',true);
-	$("#bottom-panel").fadeIn(200);
+	$("#bottom-panel").fadeIn(0);
 
 	setObjectFromInputs(selectedObject);
 
@@ -281,6 +285,7 @@ function initialization(currentObject) {
 	updateStatus(currentObject, "Comparing colors...", 0);
 
 	addLog("Initializing '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "): min area: " + object.min_area + ', max area: ' + object.max_area + ', min compactness: ' + object.min_compactness + ', max compactness: ' + object.max_compactness + ', min convexity: ' + object.min_convexity + ', max convexity: ' + object.max_convexity + ', min aspect ratio=' + object.min_aspect_ratio + ', max aspect ratio=' + object.max_aspect_ratio + ', min major axis angle: ' + object.min_major_axis_angle + ', max major axis angle: ' + object.max_major_axis_angle);
+	addLog('Colors comparison started.');
 
 	pplColorTargetLab = [];
 	xplColorTargetLab = [];
@@ -359,6 +364,7 @@ function comparison(currentObject, start, end, perc) {
 
 function preSegmentation(currentObject) {
 	updateStatus(currentObject, "Segmentation...", 0);
+	addLog('Segmentation started.');
 
 	imgDataMaskB = imgDataMask.slice();
 
@@ -451,6 +457,7 @@ function segmentation(currentObject, x_start, x_end, perc) {
 
 function preFiltering(currentObject) {
 	updateStatus(currentObject, "Filtering...", 0);
+	addLog('Filtering started.');
 
 	var perc = 0;
 	var step = 500;
@@ -592,8 +599,9 @@ function filtering(currentObject, start, end, perc) {
 }
 
 function rendering(currentObject) {
-	/* RENDER */
+	addLog('Rendering started.');
 
+	/* RENDER */
 	if (comparisonPoints.length > 0) {
 		var renderSegmentColorRgb = hexToRgb(object.render_segment_color);
 		var comparisonObjectPoints = comparisonPoints.filter(point => point.name == object.obj_name);
@@ -682,7 +690,7 @@ function rendering(currentObject) {
 			}
 		});
 
-		var logText = "Stats Object '" + object.obj_name + "' (" + currentObject + " of " + maxObjects + "):";
+		var logText = "Object '" + object.obj_name + "' stats (" + currentObject + " of " + maxObjects + "):";
 
 		for (let statName in stats[currentObject]) {
 			logText += "<br>>> " + statName + ": ";
@@ -776,7 +784,7 @@ function rgb2lab(color) {
 
 // calculate the perceptual distance between colors in CIELAB
 // https://github.com/THEjoezack/ColorMine/blob/master/ColorMine/ColorSpaces/Comparisons/Cie94Comparison.cs
-//http://zschuessler.github.io/DeltaE/learn/
+// http://zschuessler.github.io/DeltaE/learn/
 function deltaE(labA, labB) {
 	var deltaL = labA[0] - labB[0];
 	var deltaA = labA[1] - labB[1];
@@ -868,7 +876,7 @@ function addLog(text) {
 	var minutes = date.getMinutes();
 	var hours = date.getHours();
 	var now = hours + ':' + minutes + ':' + seconds;
-	text = '<div>> ' + now + ' ' + text + '</div>';
+	text = '<div class="mb-3"><div class="small">' + now + '</div><div>' + text + '<div></div>';
 	$("#log").append(text);
 	$("#log").scrollTop($('#log')[0].scrollHeight);
 }

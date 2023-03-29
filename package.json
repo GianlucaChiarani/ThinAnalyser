@@ -1,6 +1,6 @@
 {
   "name": "thin_analyser",
-  "description": "",
+  "description": "An app for image analysis of soil thin sections.",
   "version": "1.3.0",
   "main": "main.js",
   "author": "Gianluca Chiarani",
