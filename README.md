@@ -1,5 +1,5 @@
-# ThinAnalyser
-Thin Analyser is an image analysis application created for soil micromorphology that allows the identification and quantification of objects having consistent color and shape within an image pair.
+# Thin Analyser
+Thin Analyser is an image analysis app created for soil micromorphology that allows the identification and quantification of objects having consistent color and shape within an image pair.
 
 ## Requirements
 ### Software
