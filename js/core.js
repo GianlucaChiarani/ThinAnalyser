@@ -159,10 +159,10 @@ function xplHandleImage(e) {
 				$('#xpl_preview').css("display", "block");
 				$('#xpl_upload_icon').css("display", "none");
 			} else {
-				bootbox.alert("PPL & XPL images haven't same size.");
+				bootbox.alert("Images haven't same size.");
 			}
 		} else {
-			bootbox.alert("You must upload PPL image before.");
+			bootbox.alert("You must upload image 1 before.");
 		}
 
 		$('#loading').css("display", "none");
@@ -192,7 +192,7 @@ function crop() {
 				margin.left = margins[3];
 
 				bootbox.prompt({
-					title: "enter horizontal & vertical XPL offset (in px)",
+					title: "enter horizontal & vertical image 2 offset (in px)",
 					value: margin.offsetX + ',' + margin.offsetY,
 					callback: function (offsets) {
 						if (offsets) {
@@ -484,7 +484,6 @@ function filtering(currentObject, start, end, perc) {
 			var compactness = ((4 * Math.PI) * area) / Math.pow(segment.perimeterPixels.length, 2);
 			
 			if (compactness >= object.min_compactness && compactness <= object.max_compactness) {
-				//calcolo perimetro convesso
 				var convexHull = getConvexHull(segment.perimeterPixels);
 
 				if (convexHull == false) {
@@ -502,8 +501,6 @@ function filtering(currentObject, start, end, perc) {
 				}
 
 				if (convexity >= object.min_convexity && convexity <= object.max_convexity) {
-
-					//calcolo asse maggiore
 					var majorAxis = {};
 					majorAxis.length = 0;
 					convexHull.sort(sortfirst);
@@ -526,10 +523,8 @@ function filtering(currentObject, start, end, perc) {
 
 					majorAxis.angle = Math.atan2(-(majorAxis.y2 - majorAxis.y1), majorAxis.x2 - majorAxis.x1);
 					
-					//conversione in gradi
 					majorAxis.angle = Math.round((majorAxis.angle * 180) / Math.PI); 
 
-					//calcolo asse minore e baricentro
 					var minorAxis = {};
 					minorAxis.length = 0;
 					var sum_x = 0;
@@ -750,7 +745,7 @@ function hexToRgb(hex) {
 	} : null;
 }
 
-//Copyright (c) 2014 Kevin Kwok <antimatter15@gmail.com>
+// https://github.com/antimatter15/rgb-lab
 function rgb2lab(color) {
 	let key = String(color.r) + String(color.g) + String(color.b);
 
@@ -782,9 +777,8 @@ function rgb2lab(color) {
 	}
 }
 
-// calculate the perceptual distance between colors in CIELAB
 // https://github.com/THEjoezack/ColorMine/blob/master/ColorMine/ColorSpaces/Comparisons/Cie94Comparison.cs
-// http://zschuessler.github.io/DeltaE/learn/
+
 function deltaE(labA, labB) {
 	var deltaL = labA[0] - labB[0];
 	var deltaA = labA[1] - labB[1];
@@ -1231,7 +1225,7 @@ function importSegments(event) {
 		value: columnName,
 		callback: function(columnName) {
 			bootbox.prompt({
-				title: "Insert default PPL & XPL tollerance",
+				title: "Insert default image 1 & 2 tollerance",
 				value: defaultTollerance.ppl + "," + defaultTollerance.xpl,
 				callback: function (defaultTollerances) {
 					defaultTollerances = defaultTollerances.split(',');
