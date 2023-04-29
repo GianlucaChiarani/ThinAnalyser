@@ -1,6 +1,8 @@
 # Thin Analyser
 Thin Analyser is an image analysis app created for soil micromorphology that allows the identification and quantification of objects having consistent color and shape within an image pair.
 
+[Web](https://www.gianlucachiarani.it/projects/ThinAnalyser) - [Desktop](https://www.gianlucachiarani.it/projects/ThinAnalyser/download.html)
+
 ## Requirements
 ### Software
 Chrome, Edge, Firefox, Safari (most up-to-date desktop versions) with Javascript enabled.
