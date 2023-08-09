@@ -2,17 +2,18 @@
 <html>
 
 <head>
-	<title>Thin Analyser</title>
+	<title>Thin Analyser - Image Analysis Online</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<meta http-equiv="content-type" content="text/html; charset=utf-8" />
 	<meta name="description" content="Free image analysis software for soil thin sections." />
-	<meta name="keywords" content="Thin sections, Image analysis, Soil micromorphology, Microscopy, Digital imaging, Pedology, Geology, Soil science, Data analysis, Quantification, Research tools, Free, Software">
+	<meta name="keywords" content="Thin sections, Image analysis, Soil micromorphology, Microscopy, Digital imaging, Pedology, Geology, Soil science, Data analysis, Quantification, Research tools, Free, Software, Online">
 	<meta name="author" content="Gianluca Chiarani">
 	<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate" />
 
 	<link href="css/bootstrap.css" rel="stylesheet" type="text/css" />
 	<link href="css/fontawesome.css" rel="stylesheet" type="text/css" />
-	<link href="css/style.css?v=1.3.0" rel="stylesheet" type="text/css" />
+	<link href="css/sweetalert2.min.css" rel="stylesheet" type="text/css" />
+	<link href="css/style.css?v=1.4.0" rel="stylesheet" type="text/css" />
 	<link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 
@@ -31,7 +32,7 @@
 							</a>
 						</div>
 					</div>
-					<div class="col text-center">Thin Analyser 1.3.0</div>
+					<div class="col text-center">Thin Analyser 1.4.0</div>
 					<div class="col text-end">
 						<a id="info-btn" class="btn btn-sm text-light" href="https://github.com/GianlucaChiarani/ThinAnalyser" target="_blank" title="&copy; 2023 Gianluca Chiarani. GNU General Public License (GPL)">
 							<i class="fa fa-info"></i>
@@ -174,7 +175,7 @@
 						</div>
 					</div>
 				</div>
-				<div id="action-buttons" class="text-end row g-2 my-3">
+				<div id="action-buttons" class="bg-blur position-sticky bottom-0 text-end row gx-2 py-3">
 					<div class="col">
 						<div class="btn btn-secondary w-100" onclick="crop();" title="Crop images"><i class="fa fa-cut"></i></div>
 					</div>
@@ -251,7 +252,7 @@
 					</div>
 				</div>
 				
-				<div class="btn position-absolute" style="bottom: 1rem; right: 1rem;" onclick="$('#bottom-panel').show(0)" title="Show logs panel"><i class="fa fa-chevron-up"></i></div>
+				<div class="btn position-absolute" style="bottom: 1rem; right: 1rem;" onclick="document.getElementById('bottom-panel').style.display = 'block';" title="Show logs panel"><i class="fa fa-chevron-up"></i></div>
 				<div id="bottom-panel" class="position-absolute w-100 bg-blur p-3">
 					<div class="row align-items-center mb-2">
 						<div class="col-auto">
@@ -263,7 +264,7 @@
 							<div id="status" style="font-size: 32px; line-height: 44px;">Ready.</div>
 						</div>
 						<div class="col-auto">
-							<div class="btn btn-sm" onclick="$('#bottom-panel').hide(0)" title="Hide logs panel"><i class="fa fa-chevron-down"></i></div>
+							<div class="btn btn-sm" onclick="document.getElementById('bottom-panel').style.display = 'none';" title="Hide logs panel"><i class="fa fa-chevron-down"></i></div>
 						</div>
 					</div>
 					<div id="progress-bar" class="rounded bg-primary"></div>
@@ -279,27 +280,30 @@
 
 	<div class="loading" id="loading">Loading&#8230;</div>
 
-	<script type="text/javascript" src="js/jquery.js"></script>
 	<script type="text/javascript" src="js/bootstrap.bundle.js"></script>
-	<script type="text/javascript" src="js/bootbox.js"></script>
+	<script type="text/javascript" src="js/sweetalert2.all.min.js"></script>
 	<script type="text/javascript" src="js/math.js"></script>
 	<script type="text/javascript" src="js/core.js?v=1.3.0"></script>
 
 	<script>
-		$(function() {
-			var userAgent = navigator.userAgent.toLowerCase();
-			if (userAgent.indexOf(' electron/') > -1) {
-				$('body').addClass('electron');
-			}
-		});
-		$('body').click(function() {
-			$('.tooltip').remove();
-		});
+		document.addEventListener("DOMContentLoaded", function () {
+				var userAgent = navigator.userAgent.toLowerCase();
+				if (userAgent.indexOf(' electron/') > -1) {
+					document.body.classList.add('electron');
+				}
+
+				document.body.addEventListener("click", function () {
+					var tooltips = document.querySelectorAll('.tooltip');
+					tooltips.forEach(function (tooltip) {
+						tooltip.remove();
+					});
+				});
+			});
 	</script>
 	<script>
-		$('[title]').each(function() {
-			new bootstrap.Tooltip($(this));
-		});
+		document.querySelectorAll('[title]').forEach(function (element) {
+				new bootstrap.Tooltip(element);
+			});
 	</script>
 </body>
 
