@@ -6,6 +6,7 @@
  */
 
 "use strict";
+
 class ThinAnalyser {
   constructor() {
     this.pplPreviewCanvas = document.getElementById("ppl_preview_canvas");
@@ -526,10 +527,10 @@ class ThinAnalyser {
           let delta1 = this.deltaE(this.pplColorTargetLab[i2], color1);
           let delta2 = this.deltaE(this.xplColorTargetLab[i2], color2);
 
-          const pplTollerance = this.object["ppl_tollerance_" + (i2 + 1)];
-          const xplTollerance = this.object["xpl_tollerance_" + (i2 + 1)];
+          const pplTolerance = this.object["ppl_tolerance_" + (i2 + 1)];
+          const xplTolerance = this.object["xpl_tolerance_" + (i2 + 1)];
 
-          if (pplTollerance >= delta1 && xplTollerance >= delta2) close = true;
+          if (pplTolerance >= delta1 && xplTolerance >= delta2) close = true;
         }
       } else {
         close = false;
@@ -1171,12 +1172,12 @@ class ThinAnalyser {
     ];
   }
 
-  isClose(color1, color2, tollerance) {
+  isClose(color1, color2, tolerance) {
     const distance =
       Math.abs(color1.r - color2.r) +
       Math.abs(color1.g - color2.g) +
       Math.abs(color1.b - color2.b);
-    if (distance <= tollerance) return true;
+    if (distance <= tolerance) return true;
     return false;
   }
 
@@ -1498,9 +1499,9 @@ class ThinAnalyser {
     n,
     props = {
       ppl_color_target: "#FFFFFF",
-      ppl_tollerance: 15,
+      ppl_tolerance: 15,
       xpl_color_target: "",
-      xpl_tollerance: 15,
+      xpl_tolerance: 15,
     }
   ) {
     let colorsContainer = document.querySelector(".colors");
@@ -1515,16 +1516,16 @@ class ThinAnalyser {
     newColorEl.querySelector("#ppl_color_target_1").id =
       "ppl_color_target_" + n;
 
-    newColorEl.querySelector("#ppl_tollerance_1").value = props.ppl_tollerance;
-    newColorEl.querySelector("#ppl_tollerance_1").id = "ppl_tollerance_" + n;
+    newColorEl.querySelector("#ppl_tolerance_1").value = props.ppl_tolerance;
+    newColorEl.querySelector("#ppl_tolerance_1").id = "ppl_tolerance_" + n;
 
     newColorEl.querySelector("#xpl_color_target_1").value =
       props.xpl_color_target;
     newColorEl.querySelector("#xpl_color_target_1").id =
       "xpl_color_target_" + n;
 
-    newColorEl.querySelector("#xpl_tollerance_1").value = props.xpl_tollerance;
-    newColorEl.querySelector("#xpl_tollerance_1").id = "xpl_tollerance_" + n;
+    newColorEl.querySelector("#xpl_tolerance_1").value = props.xpl_tolerance;
+    newColorEl.querySelector("#xpl_tolerance_1").id = "xpl_tolerance_" + n;
 
     colorsContainer.appendChild(newColorEl);
   }
@@ -1643,7 +1644,7 @@ class ThinAnalyser {
   importSegments(event) {
     const file = event.target.files[0];
     const columnName = "descr";
-    let defaultTollerance = { ppl: 15, xpl: 15 };
+    let defaultTolerance = { ppl: 15, xpl: 15 };
 
     if (!file) {
       return;
@@ -1664,9 +1665,9 @@ class ThinAnalyser {
     }).then((result) => {
       let columnName = result.value;
       Swal.fire({
-        title: "Insert default image 1 & 2 tollerance",
+        title: "Insert default image 1 & 2 tolerance",
         input: "text",
-        inputValue: defaultTollerance.ppl + "," + defaultTollerance.xpl,
+        inputValue: defaultTolerance.ppl + "," + defaultTolerance.xpl,
         showCancelButton: true,
         confirmButtonText: "Next",
         cancelButtonText: "Cancel",
@@ -1675,11 +1676,11 @@ class ThinAnalyser {
           confirmButton: "btn btn-primary me-3",
           cancelButton: "btn btn-secondary",
         },
-      }).then((defaultTollerances) => {
-        defaultTollerances = defaultTollerances.split(",");
-        defaultTollerance = {
-          ppl: defaultTollerances[0],
-          xpl: defaultTollerances[1],
+      }).then((defaultTolerances) => {
+        defaultTolerances = defaultTolerances.split(",");
+        defaultTolerance = {
+          ppl: defaultTolerances[0],
+          xpl: defaultTolerances[1],
         };
 
         let reader = new FileReader();
@@ -1753,9 +1754,9 @@ class ThinAnalyser {
                   newObjects[this.object.name] = {
                     obj_name: this.object.name,
                     ppl_color_target_1: objectColor.ppl,
-                    ppl_tollerance_1: defaultTollerance.ppl,
+                    ppl_tolerance_1: defaultTolerance.ppl,
                     xpl_color_target_1: objectColor.xpl,
-                    xpl_tollerance_1: defaultTollerance.xpl,
+                    xpl_tolerance_1: defaultTolerance.xpl,
                     max_colors: 1,
                     render_color:
                       "#" + Math.floor(Math.random() * 16777215).toString(16),
@@ -1798,8 +1799,8 @@ class ThinAnalyser {
                     );
 
                     if (
-                      defaultTollerance.ppl >= deltaPpl &&
-                      defaultTollerance.xpl >= deltaXpl
+                      defaultTolerance.ppl >= deltaPpl &&
+                      defaultTolerance.xpl >= deltaXpl
                     )
                       close = true;
                   }
@@ -1815,11 +1816,11 @@ class ThinAnalyser {
                       "xpl_color_target_" + colorIndex
                     ] = this.objectColor.this.xpl;
                     newObjects[this.object.name][
-                      "ppl_tollerance_" + colorIndex
-                    ] = defaultTollerance.this.ppl;
+                      "ppl_tolerance_" + colorIndex
+                    ] = defaultTolerance.this.ppl;
                     newObjects[this.object.name][
-                      "xpl_tollerance_" + colorIndex
-                    ] = defaultTollerance.this.xpl;
+                      "xpl_tolerance_" + colorIndex
+                    ] = defaultTolerance.this.xpl;
                   }
                 }
               });
@@ -1974,12 +1975,12 @@ class ThinAnalyser {
     const data = {
       ppl_color_target: [],
       xpl_color_target: [],
-      ppl_tollerance: [],
-      xpl_tollerance: [],
+      ppl_tolerance: [],
+      xpl_tolerance: [],
       ppl_color_target_1: "#ffffff",
       xpl_color_target_1: "#000000",
-      ppl_tollerance_1: "15",
-      xpl_tollerance_1: "15",
+      ppl_tolerance_1: "15",
+      xpl_tolerance_1: "15",
       max_colors: 1,
       min_area: 10,
       max_area: 100000,
