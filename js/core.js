@@ -1,11 +1,11 @@
 /**
  * Thin Analyser (https://github.com/GianlucaChiarani/ThinAnalyser)
- * @version 1.4.0
+ * @version 1.5.0
  * @author Gianluca Chiarani
  * @license GNU General Public License (GPL)
  */
 
-"use strict";
+Tiff.initialize({ TOTAL_MEMORY: 19777216 * 10 }); // 197 MB
 
 class ThinAnalyser {
   constructor() {
@@ -41,7 +41,6 @@ class ThinAnalyser {
 
     this.ppl = null;
     this.xpl = null;
-    this.pplUploaded = false;
 
     this.percAdd = null;
 
@@ -122,116 +121,130 @@ class ThinAnalyser {
   }
 
   pplHandleImage(e) {
-    this.ppl = new Image();
+    const file = e.target.files[0];
+    if (!file) return;
 
-    this.ppl.onload = () => {
-      this.pplPreviewCanvas.width = this.ppl.width;
-      this.pplPreviewCanvas.height = this.ppl.height;
-      this.pplCroppedCanvas.width = this.ppl.width;
-      this.pplCroppedCanvas.height = this.ppl.height;
-      this.pplResultsCanvas.width = this.ppl.width;
-      this.pplResultsCanvas.height = this.ppl.height;
+    document.getElementById("loading").style.display = "block";
 
-      this.pplPreviewCtx.drawImage(this.ppl, 0, 0);
-      this.pplCroppedCtx.drawImage(this.ppl, 0, 0);
-      this.pplResultsCtx.drawImage(this.ppl, 0, 0);
-
-      this.margin = {
-        top: 0,
-        left: 0,
-        bottom: 0,
-        right: 0,
-        offsetX: 0,
-        offsetY: 0,
+    if (file.type === "image/tiff" || file.type === "image/x-tiff") {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const tiff = new Tiff({ buffer: event.target.result });
+        this.ppl = tiff.toCanvas();
+        this.drawOnCanvases("ppl");
       };
-      this.pplUploaded = true;
-
-      document.getElementById("loading").style.display = "none";
-      document.getElementById("ppl_preview").style.display = "block";
-      document.getElementById("ppl_upload_icon").style.display = "none";
-    };
-
-    this.ppl.onerror = () => {
-      document.getElementById("loading").style.display = "none";
-
-      Swal.fire({
-        text: "File not valid",
-        icon: "warning",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-    };
-
-    if (typeof e.target.files[0] != "undefined") {
-      document.getElementById("loading").style.display = "block";
-      this.ppl.src = URL.createObjectURL(e.target.files[0]);
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const ctx = tempCanvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          this.ppl = tempCanvas;
+          this.drawOnCanvases("ppl");
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
     }
   }
 
   xplHandleImage(e) {
-    this.xpl = new Image();
+    const file = e.target.files[0];
+    if (!file) return;
 
-    this.xpl.onload = () => {
-      if (this.pplUploaded) {
-        if (
-          this.xpl.width == this.ppl.width &&
-          this.xpl.height == this.ppl.height
-        ) {
-          this.xplPreviewCanvas.width = this.xpl.width;
-          this.xplPreviewCanvas.height = this.xpl.height;
-          this.xplCroppedCanvas.width = this.xpl.width;
-          this.xplCroppedCanvas.height = this.xpl.height;
-          this.xplResultsCanvas.width = this.xpl.width;
-          this.xplResultsCanvas.height = this.xpl.height;
+    if (!this.ppl) {
+      Swal.fire({
+        text: "You must upload image 1 before.",
+        icon: "warning",
+        timer: 3000,
+        showConfirmButton: false,
+      });
+      return;
+    }
 
-          this.xplPreviewCtx.drawImage(this.xpl, 0, 0);
-          this.xplCroppedCtx.drawImage(this.xpl, 0, 0);
-          this.xplResultsCtx.drawImage(this.xpl, 0, 0);
+    document.getElementById("loading").style.display = "block";
 
-          this.margin = {
-            top: 0,
-            left: 0,
-            bottom: 0,
-            right: 0,
-            offsetX: 0,
-            offsetY: 0,
-          };
+    if (file.type === "image/tiff" || file.type === "image/x-tiff") {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const tiff = new Tiff({ buffer: event.target.result });
+        this.xpl = tiff.toCanvas();
+        this.drawOnCanvases("xpl");
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const tempCanvas = document.createElement("canvas");
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          const ctx = tempCanvas.getContext("2d");
+          ctx.drawImage(img, 0, 0);
+          this.xpl = tempCanvas;
+          this.drawOnCanvases("xpl");
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  }
 
-          document.getElementById("xpl_preview").style.display = "block";
-          document.getElementById("xpl_upload_icon").style.display = "none";
-        } else {
-          Swal.fire({
-            text: "Images haven't same size.",
-            icon: "warning",
-            timer: 3000,
-            showConfirmButton: false,
-          });
-        }
+  drawOnCanvases(type) {
+    const canvas = this[type];
+    const width = canvas.width;
+    const height = canvas.height;
+
+    if (type === "ppl") {
+      this.pplPreviewCanvas.width = width;
+      this.pplPreviewCanvas.height = height;
+      this.pplCroppedCanvas.width = width;
+      this.pplCroppedCanvas.height = height;
+      this.pplResultsCanvas.width = width;
+      this.pplResultsCanvas.height = height;
+
+      this.pplPreviewCtx.drawImage(canvas, 0, 0);
+      this.pplCroppedCtx.drawImage(canvas, 0, 0);
+      this.pplResultsCtx.drawImage(canvas, 0, 0);
+
+      this.pplUploaded = true;
+      document.getElementById("ppl_preview").style.display = "block";
+      document.getElementById("ppl_upload_icon").style.display = "none";
+    } else if (type === "xpl") {
+      if (
+        width === this.pplPreviewCanvas.width &&
+        height === this.pplPreviewCanvas.height
+      ) {
+        this.xplPreviewCanvas.width = width;
+        this.xplPreviewCanvas.height = height;
+        this.xplCroppedCanvas.width = width;
+        this.xplCroppedCanvas.height = height;
+        this.xplResultsCanvas.width = width;
+        this.xplResultsCanvas.height = height;
+
+        this.xplPreviewCtx.drawImage(canvas, 0, 0);
+        this.xplCroppedCtx.drawImage(canvas, 0, 0);
+        this.xplResultsCtx.drawImage(canvas, 0, 0);
+
+        document.getElementById("xpl_preview").style.display = "block";
+        document.getElementById("xpl_upload_icon").style.display = "none";
       } else {
         Swal.fire({
-          text: "You must upload image 1 before.",
+          text: "Images haven't same size.",
           icon: "warning",
           timer: 3000,
           showConfirmButton: false,
         });
       }
-
-      document.getElementById("loading").style.display = "none";
-    };
-    this.xpl.onerror = () => {
-      document.getElementById("loading").style.display = "none";
-      Swal.fire({
-        text: "File not valid",
-        icon: "warning",
-        timer: 3000,
-        showConfirmButton: false,
-      });
-    };
-
-    if (typeof e.target.files[0] != "undefined") {
-      document.getElementById("loading").style.display = "block";
-      this.xpl.src = URL.createObjectURL(e.target.files[0]);
     }
+
+    document.getElementById("loading").style.display = "none";
   }
 
   crop() {
@@ -823,7 +836,7 @@ class ThinAnalyser {
       this.updateStatus(currentObject, "Filtering...", perc);
     }
   }
-  /* arrivato qui */
+
   rendering(currentObject) {
     let comparisonObjectPoints, renderSegmentColorRgb;
     this.addLog("Rendering started.");
