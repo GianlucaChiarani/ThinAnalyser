@@ -1070,7 +1070,7 @@ class ThinAnalyser {
 
   // https://github.com/antimatter15/rgb-lab
   rgb2lab(color) {
-    const key = String(color.r) + String(color.g) + String(color.b);
+    const key = (color.r << 16) | (color.g << 8) | color.b;
 
     if (typeof this.labColors[key] == "undefined") {
       let r = color.r / 255,
