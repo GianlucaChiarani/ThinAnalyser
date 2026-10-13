@@ -786,6 +786,27 @@ class ThinAnalyser {
   }
 
   prepareResults(currentObject) {
+    const containsPoint = (segment, point) => segment.areaPixels.some(
+      (pixel) => pixel[0] + this.margin.left === point.x && pixel[1] + this.margin.top === point.y
+    );
+    const trainingObjectPoints = this.trainingPoints.filter(
+      (point) => !point.name || point.name === this.object.obj_name
+    );
+    this.filteredTrainingPoints[currentObject] = [];
+    if (trainingObjectPoints.length) {
+      this.filteredTrainingPoints[currentObject] = this.filtered[currentObject].filter(
+        (segment) => trainingObjectPoints.some((point) => containsPoint(segment, point))
+      );
+      this.filtered[currentObject] = this.filteredTrainingPoints[currentObject];
+    }
+    this.validPixels[currentObject] = this.filtered[currentObject].reduce(
+      (total, segment) => total + segment.areaPixels.length, 0
+    );
+    this.comparisonValidPoints[currentObject] = this.comparisonPoints.filter(
+      (point) => point.name === this.object.obj_name &&
+        this.filtered[currentObject].some((segment) => containsPoint(segment, point))
+    ).map((point) => [point.x - this.margin.left, point.y - this.margin.top]);
+
     for (const segment of this.filtered[currentObject]) {
       for (const point of segment.areaPixels) {
         const position = point[1] * this.pplCroppedCanvas.width + point[0];
@@ -809,82 +830,28 @@ class ThinAnalyser {
     }
 
     const renderColorRgb = this.hexToRgb(this.object.render_color);
+    let matchedSegmentCount = 0;
 
     for (let p = 0; p < this.filtered[currentObject].length; p += 1) {
       let segment = this.filtered[currentObject][p];
-
-      if (this.object.render_mode == "fill") {
-        for (let i = 0; i < segment.areaPixels.length; i += 1) {
-          let point = segment.areaPixels[i];
-
-          const pos =
-            point[1] * (this.pplCroppedCanvas.width * 4) + point[0] * 4;
-
-          this.imgData.ppl.data[pos] = renderColorRgb.r;
-          this.imgData.ppl.data[pos + 1] = renderColorRgb.g;
-          this.imgData.ppl.data[pos + 2] = renderColorRgb.b;
-          this.imgData.xpl.data[pos] = renderColorRgb.r;
-          this.imgData.xpl.data[pos + 1] = renderColorRgb.g;
-          this.imgData.xpl.data[pos + 2] = renderColorRgb.b;
-
-          if (
-            comparisonObjectPoints.some(
-              (e) =>
-                e.x == point[0] + this.margin.left &&
-                e.y == point[1] + this.margin.top
-            )
-          ) {
-            for (let ii = 0; ii < segment.areaPixels.length; ii += 1) {
-              let point = segment.areaPixels[ii];
-
-              const pos =
-                point[1] * (this.pplCroppedCanvas.width * 4) + point[0] * 4;
-
-              this.imgData.ppl.data[pos] = renderSegmentColorRgb.r;
-              this.imgData.ppl.data[pos + 1] = renderSegmentColorRgb.g;
-              this.imgData.ppl.data[pos + 2] = renderSegmentColorRgb.b;
-              this.imgData.xpl.data[pos] = renderSegmentColorRgb.r;
-              this.imgData.xpl.data[pos + 1] = renderSegmentColorRgb.g;
-              this.imgData.xpl.data[pos + 2] = renderSegmentColorRgb.b;
-            }
-            i = segment.areaPixels.length;
-
-            this.comparisonValidPoints[currentObject].push([
-              point[0],
-              point[1],
-            ]);
-          }
-
-          if (
-            this.trainingPoints.some(
-              (e) =>
-                e.x == point[0] + this.margin.left &&
-                e.y == point[1] + this.margin.top
-            )
-          ) {
-            this.filteredTrainingPoints[currentObject].push(segment);
-          }
-        }
+      const hasComparisonPoint = comparisonObjectPoints.some(
+        (point) => segment.areaPixels.some(
+          (pixel) => pixel[0] + this.margin.left === point.x && pixel[1] + this.margin.top === point.y
+        )
+      );
+      if (hasComparisonPoint) matchedSegmentCount += 1;
+      const color = hasComparisonPoint ? renderSegmentColorRgb : renderColorRgb;
+      const pixels = this.object.render_mode === "only_border"
+        ? segment.perimeterPixels : segment.areaPixels;
+      for (const point of pixels) {
+        const pos = point[1] * (this.pplCroppedCanvas.width * 4) + point[0] * 4;
+        this.imgData.ppl.data[pos] = color.r;
+        this.imgData.ppl.data[pos + 1] = color.g;
+        this.imgData.ppl.data[pos + 2] = color.b;
+        this.imgData.xpl.data[pos] = color.r;
+        this.imgData.xpl.data[pos + 1] = color.g;
+        this.imgData.xpl.data[pos + 2] = color.b;
       }
-
-      if (this.object.render_mode == "only_border") {
-        for (let i = 0; i < segment.perimeterPixels.length; i += 1) {
-          let point = segment.perimeterPixels[i];
-
-          let pos = point[1] * (this.pplCroppedCanvas.width * 4) + point[0] * 4;
-
-          this.imgData.ppl.data[pos] = renderColorRgb.r;
-          this.imgData.ppl.data[pos + 1] = renderColorRgb.g;
-          this.imgData.ppl.data[pos + 2] = renderColorRgb.b;
-          this.imgData.xpl.data[pos] = renderColorRgb.r;
-          this.imgData.xpl.data[pos + 1] = renderColorRgb.g;
-          this.imgData.xpl.data[pos + 2] = renderColorRgb.b;
-        }
-      }
-    }
-
-    if (this.filteredTrainingPoints[currentObject].length) {
-      this.filtered[currentObject] = this.filteredTrainingPoints[currentObject];
     }
 
     this.addLog(
@@ -907,9 +874,8 @@ class ThinAnalyser {
     );
 
     /* stats */
+    this.stats[currentObject] = {};
     if (this.filtered[currentObject].length > 0) {
-      this.stats[currentObject] = {};
-
       this.statsProperties.forEach((statName) => {
         let values = this.filtered[currentObject].map((a) =>
           math.round(a.stats[statName], 2)
@@ -960,14 +926,15 @@ class ThinAnalyser {
             (this.comparisonValidPoints[currentObject].length * 100) /
             comparisonObjectPoints.length
           ).toFixed(2) +
-          " %), valid points on valid segments: " +
-          this.comparisonValidPoints[currentObject].length +
+          " %), segments with valid points: " +
+          matchedSegmentCount +
           "/" +
           this.filtered[currentObject].length +
           "(" +
           (
-            (this.comparisonValidPoints[currentObject].length * 100) /
             this.filtered[currentObject].length
+              ? (matchedSegmentCount * 100) / this.filtered[currentObject].length
+              : 0
           ).toFixed(2) +
           " %)"
       );
@@ -978,10 +945,11 @@ class ThinAnalyser {
         const statNameS = statName
           .replace("aspectRatio", "aspect_ratio")
           .replace("majorAxisAngle", "major_axis_angle");
+        const values = this.filtered[currentObject].map((segment) => segment.stats[statName]);
         document.querySelector("#min_" + statNameS).value =
-          this.stats[currentObject][statName].min;
+          math.min(values);
         document.querySelector("#max_" + statNameS).value =
-          this.stats[currentObject][statName].max;
+          math.max(values);
       }
 
       this.addLog("object '" + this.object.obj_name + "' trained");

@@ -196,8 +196,6 @@ function renderSegmentCase(mode, comparisonPoints = [], trainingPoints = []) {
   };
   analyser.sourceImgData = { ppl: pixels.slice(), xpl: pixels.slice() };
   analyser.totalPixels = 50 * 40;
-  analyser.comparisonValidPoints[1] = [];
-  analyser.filteredTrainingPoints[1] = [];
   analyser.rendering(1);
   return analyser;
 }
@@ -247,4 +245,40 @@ test("start snapshots source pixels independently of rendering buffers", () => {
   analyser.imgData.xpl.data[0] = 0;
   assert.equal(analyser.sourceImgData.ppl[0], 100);
   assert.equal(analyser.sourceImgData.xpl[0], 100);
+});
+
+test("point comparison counts every matching point in fill and border modes", () => {
+  const points = [{ name: "test", x: 5, y: 5 }, { name: "test", x: 7, y: 7 }, { name: "other", x: 6, y: 6 }];
+  for (const mode of ["fill", "only_border"]) {
+    const analyser = renderSegmentCase(mode, points);
+    assert.equal(analyser.comparisonValidPoints[1].length, 2);
+    assert.deepEqual(Array.from(analyser.comparisonValidPoints[1], (point) => Array.from(point)), [[5, 5], [7, 7]]);
+    assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 9);
+  }
+});
+
+test("training includes a segment only once even with multiple training points", () => {
+  for (const mode of ["fill", "only_border"]) {
+    const analyser = renderSegmentCase(mode, [], [{ x: 5, y: 5 }, { x: 7, y: 7 }]);
+    assert.equal(analyser.filtered[1].length, 1);
+    assert.equal(analyser.validPixels[1], 9);
+    assert.equal(analyser.stats[1].area.mean, 9);
+  }
+});
+
+test("training selection updates counts, masks and results before rendering", () => {
+  const segments = [createSegment(rectanglePoints(3, 3)), createSegment([[20, 20], [21, 20]])];
+  const analyser = filterSegments(segments, {}, { trainingPoints: [{ name: "test", x: 5, y: 5 }, { name: "other", x: 20, y: 20 }] });
+  assert.equal(analyser.filtered[1].length, 1);
+  assert.equal(analyser.validPixels[1], 9);
+  assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 9);
+});
+
+test("training with no matching segment yields empty results instead of all segments", () => {
+  const analyser = renderSegmentCase("fill", [{ name: "test", x: 5, y: 5 }], [{ name: "test", x: 20, y: 20 }]);
+  assert.equal(analyser.filtered[1].length, 0);
+  assert.equal(analyser.validPixels[1], 0);
+  assert.equal(analyser.comparisonValidPoints[1].length, 0);
+  assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 0);
+  assert.deepEqual(Object.keys(analyser.stats[1]), []);
 });
