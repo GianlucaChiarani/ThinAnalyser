@@ -300,3 +300,206 @@ test("new object render colors retain all six hexadecimal digits", () => {
   analyser.addObjBtn();
   assert.equal(analyser.getObject(2).render_color, "#000000");
 });
+
+function createImportFixture(responses, data, overrides = {}) {
+  const dialogs = [];
+  const elements = new Map();
+  const pixels = new Uint8ClampedArray(10 * 10 * 4);
+  const getElement = (selector) => {
+    if (!elements.has(selector)) elements.set(selector, { style: {} });
+    return elements.get(selector);
+  };
+  const analyser = createAnalyser({
+    pplPreviewCanvas: { width: 10, height: 10 },
+    xplPreviewCanvas: { width: 10, height: 10 },
+    pplPreviewCtx: { getImageData: () => ({ data: pixels.slice() }) },
+    xplPreviewCtx: { getImageData: () => ({ data: pixels.slice() }) },
+    setInputsFromObject() {},
+    drawPoints() {},
+    ...overrides,
+  }, {
+    document: { getElementById: getElement, querySelector: getElement },
+    Swal: { async fire(options) { dialogs.push(options); return responses.shift() || {}; } },
+  });
+  let reads = 0;
+  const event = { target: { files: [{ async text() { reads += 1; return typeof data === "string" ? data : JSON.stringify(data); } }] } };
+  return { analyser, dialogs, elements, event, get reads() { return reads; } };
+}
+
+function geoJsonPoints(points) {
+  return {
+    type: "FeatureCollection",
+    features: points.map(([name, x, y]) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [x, -y] },
+      properties: { descr: name },
+    })),
+  };
+}
+
+test("SweetAlert point import reads result.value and updates the color container", async () => {
+  const fixture = createImportFixture([{ isConfirmed: true, value: "descr" }], geoJsonPoints([["quartz", 2, 3]]));
+  await fixture.analyser.importPoints(fixture.event);
+  assert.equal(fixture.analyser.comparisonPoints[0].name, "quartz");
+  assert.equal(fixture.analyser.comparisonPoints[0].x, 2);
+  assert.equal(fixture.analyser.comparisonPoints[0].y, 3);
+  assert.equal(fixture.elements.get("render_segment_color_container").style.display, "block");
+  assert.equal(fixture.dialogs.at(-1).icon, "success");
+});
+
+test("SweetAlert point import cancellation preserves points without reading the file", async () => {
+  const original = [{ name: "existing", x: 1, y: 1 }];
+  const fixture = createImportFixture([{ isConfirmed: false }], geoJsonPoints([["quartz", 2, 3]]), { comparisonPoints: original });
+  await fixture.analyser.importPoints(fixture.event);
+  assert.equal(fixture.analyser.comparisonPoints, original);
+  assert.equal(fixture.reads, 0);
+});
+
+test("SweetAlert object import groups names and adds distinct color pairs", async () => {
+  const pixels = new Uint8ClampedArray(400);
+  pixels.set([255, 255, 255, 255], (2 * 10 + 2) * 4);
+  pixels.set([255, 0, 0, 255], (4 * 10 + 4) * 4);
+  const fixture = createImportFixture([
+    { isConfirmed: true, value: "descr" }, { isConfirmed: true, value: "0,0" }, { isConfirmed: true },
+  ], geoJsonPoints([["quartz", 2, 2], ["quartz", 3, 3], ["calcite", 4, 4]]), {
+    pplPreviewCtx: { getImageData: () => ({ data: pixels.slice() }) },
+  });
+  await fixture.analyser.importSegments(fixture.event);
+  assert.equal(fixture.dialogs.at(-1).icon, "success");
+  assert.equal(fixture.analyser.objects.length, 2);
+  const quartz = fixture.analyser.objects[0];
+  assert.equal(quartz.obj_name, "quartz");
+  assert.equal(quartz.max_colors, 2);
+  assert.equal(quartz.ppl_color_target_1, "#ffffff");
+  assert.equal(quartz.ppl_color_target_2, "#000000");
+  assert.equal(quartz.ppl_tolerance_2, 0);
+  assert.equal(quartz.min_aspect_ratio, 0);
+  assert.equal(quartz.render_mode, "fill");
+  assert.equal(fixture.analyser.objects[1].obj_name, "calcite");
+  assert.equal(fixture.analyser.trainingPoints.length, 3);
+});
+
+test("SweetAlert object import merges matching colors within tolerance", async () => {
+  const fixture = createImportFixture([
+    { isConfirmed: true, value: "descr" }, { isConfirmed: true, value: "15,15" }, { isConfirmed: true },
+  ], geoJsonPoints([["quartz", 2, 2], ["quartz", 3, 3]]));
+  await fixture.analyser.importSegments(fixture.event);
+  assert.equal(fixture.analyser.objects[0].max_colors, 1);
+});
+
+test("SweetAlert object import cancellation at every dialog preserves existing objects", async () => {
+  const confirmations = [{ isConfirmed: true, value: "descr" }, { isConfirmed: true, value: "15,15" }, { isConfirmed: true }];
+  for (let cancelled = 0; cancelled < confirmations.length; cancelled++) {
+    const original = [{ obj_name: "existing" }];
+    const responses = confirmations.slice(0, cancelled).concat({ isConfirmed: false });
+    const fixture = createImportFixture(responses, geoJsonPoints([["quartz", 2, 2]]), { objects: original });
+    await fixture.analyser.importSegments(fixture.event);
+    assert.equal(fixture.analyser.objects, original);
+    assert.equal(fixture.analyser.trainingPoints.length, 0);
+  }
+});
+
+test("SweetAlert imports reject invalid tolerances and GeoJSON without overwriting results", async () => {
+  for (const tolerance of ["15", "15,", "-1,15", "101,15", "abc,15"]) {
+    const original = [{ obj_name: "existing" }];
+    const fixture = createImportFixture([
+      { isConfirmed: true, value: "descr" }, { isConfirmed: true, value: tolerance },
+    ], geoJsonPoints([["quartz", 2, 2]]), { objects: original });
+    await fixture.analyser.importSegments(fixture.event);
+    assert.equal(fixture.analyser.objects, original);
+    assert.equal(fixture.dialogs.at(-1).icon, "error");
+  }
+  for (const data of ["not JSON", geoJsonPoints([["quartz", 20, 2]]), { type: "FeatureCollection", features: [] }, geoJsonPoints([["", 2, 2]])]) {
+    const original = [{ name: "existing", x: 1, y: 1 }];
+    const fixture = createImportFixture([{ isConfirmed: true, value: "descr" }], data, { comparisonPoints: original });
+    await fixture.analyser.importPoints(fixture.event);
+    assert.equal(fixture.analyser.comparisonPoints, original);
+    assert.equal(fixture.dialogs.at(-1).icon, "error");
+  }
+});
+
+test("SweetAlert training colors use original coordinates and image 2 offsets", async () => {
+  const pplPixels = new Uint8ClampedArray(400);
+  const xplPixels = new Uint8ClampedArray(400);
+  pplPixels.set([17, 34, 51, 255], (2 * 10 + 2) * 4);
+  xplPixels.set([171, 205, 239, 255], (3 * 10 + 3) * 4);
+  const renderingData = { ppl: {}, xpl: {} };
+  const fixture = createImportFixture([
+    { isConfirmed: true, value: "descr" }, { isConfirmed: true, value: "15,15" }, { isConfirmed: true },
+  ], geoJsonPoints([["quartz", 2, 2]]), {
+    margin: { left: 2, top: 2, offsetX: 1, offsetY: 1 },
+    pplPreviewCtx: { getImageData: () => ({ data: pplPixels }) },
+    xplPreviewCtx: { getImageData: () => ({ data: xplPixels }) },
+    imgData: renderingData,
+  });
+  await fixture.analyser.importSegments(fixture.event);
+  assert.equal(fixture.analyser.objects[0].ppl_color_target_1, "#112233");
+  assert.equal(fixture.analyser.objects[0].xpl_color_target_1, "#abcdef");
+  assert.equal(fixture.analyser.trainingPoints[0].x, 2);
+  assert.equal(fixture.analyser.imgData, renderingData);
+});
+
+function runSyntheticAnalysis(mode) {
+  const width = 24;
+  const height = 16;
+  const pplPixels = new Uint8ClampedArray(width * height * 4).fill(128);
+  const xplPixels = pplPixels.slice();
+  const queue = [];
+  const analyser = createAnalyser({
+    pplCroppedCanvas: { width, height },
+    xplCroppedCanvas: { width, height },
+    pplCroppedCtx: { getImageData: () => ({ data: pplPixels.slice() }) },
+    xplCroppedCtx: { getImageData: () => ({ data: xplPixels.slice() }) },
+    pplResultsCtx: { putImageData() {} },
+    xplResultsCtx: { putImageData() {} },
+    imgData: {},
+    setObjectFromInputs() {},
+    maxObjects: 2,
+    comparisonPoints: [{ name: "A", x: 1, y: 1 }, { name: "A", x: 8, y: 2 }, { name: "B", x: 15, y: 5 }],
+    trainingPoints: [{ name: "A", x: 1, y: 1 }, { name: "A", x: 8, y: 2 }, { name: "B", x: 15, y: 5 }],
+  }, {
+    setTimeout(callback, delay, ...args) { queue.push(() => callback(...args)); },
+  });
+  for (let row = 1; row < 4; row++) {
+    for (let column = 1; column < 11; column++) {
+      pplPixels.set([255, 255, 255, 255], (row * width + column) * 4);
+      xplPixels.set([0, 0, 0, 255], (row * width + column) * 4);
+    }
+  }
+  for (let row = 5; row < 11; row++) {
+    for (let column = 15; column < 18; column++) {
+      pplPixels.set([255, 0, 0, 255], (row * width + column) * 4);
+      xplPixels.set([255, 255, 255, 255], (row * width + column) * 4);
+    }
+  }
+  analyser.objects = [
+    { ...analyser.getDefaultObject("A"), min_area: 1, ppl_tolerance_1: 0, xpl_tolerance_1: 0, render_mode: mode },
+    { ...analyser.getDefaultObject("B"), min_area: 1, ppl_color_target_1: "#ff0000", xpl_color_target_1: "#ffffff", ppl_tolerance_1: 0, xpl_tolerance_1: 0, render_mode: mode },
+  ];
+  analyser.start();
+  let callbacks = 0;
+  while (queue.length) {
+    assert.ok(++callbacks < 100, "analysis must complete");
+    queue.shift()();
+  }
+  assert.deepEqual(Array.from(analyser.sourceImgData.ppl), Array.from(pplPixels));
+  assert.deepEqual(Array.from(analyser.sourceImgData.xpl), Array.from(xplPixels));
+  return analyser;
+}
+
+test("full analysis pipeline keeps two objects and reference counts independent of render mode", () => {
+  const fill = runSyntheticAnalysis("fill");
+  const border = runSyntheticAnalysis("only_border");
+  for (const analyser of [fill, border]) {
+    assert.equal(analyser.filtered[1].length, 1);
+    assert.equal(analyser.filtered[2].length, 1);
+    assert.equal(analyser.validPixels[1], 30);
+    assert.equal(analyser.validPixels[2], 18);
+    assert.equal(analyser.comparisonValidPoints[1].length, 2);
+    assert.equal(analyser.comparisonValidPoints[2].length, 1);
+    assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 48);
+    assert.ok(Math.abs(analyser.filtered[1][0].stats.aspectRatio - 0.3) < 1e-12);
+    assert.ok(Math.abs(analyser.filtered[2][0].stats.aspectRatio - 0.5) < 1e-12);
+  }
+  assert.equal(JSON.stringify(fill.filtered), JSON.stringify(border.filtered));
+});

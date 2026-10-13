@@ -1607,33 +1607,38 @@ class ThinAnalyser {
     download.setAttribute("href", data);
   }
 
-  importSegments(event) {
-    const file = event.target.files[0];
-    const columnName = "descr";
-    let defaultTolerance = { ppl: 15, xpl: 15 };
-
-    if (!file) {
-      return;
+  getGeoJsonPoints(json, columnName) {
+    if (!columnName || json.type !== "FeatureCollection" || !Array.isArray(json.features) || !json.features.length) {
+      throw new Error("Select a valid object column and a non-empty GeoJSON FeatureCollection.");
     }
+    const scale = this.customWidth ? this.customWidth / this.originalSize.width : 1;
+    return json.features.map((feature) => {
+      const coordinates = feature.geometry?.coordinates;
+      const name = feature.properties?.[columnName];
+      if (feature.geometry?.type !== "Point" || !Array.isArray(coordinates) ||
+          !Number.isFinite(coordinates[0]) || !Number.isFinite(coordinates[1]) ||
+          (typeof name !== "string" && typeof name !== "number") || !String(name).trim()) {
+        throw new Error("Each feature must be a Point with an object name in the selected column.");
+      }
+      const x = Math.round(coordinates[0] * scale);
+      const y = Math.abs(Math.round(coordinates[1] * scale));
+      if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 ||
+          x >= this.pplPreviewCanvas.width || y >= this.pplPreviewCanvas.height) {
+        throw new Error("Reference point coordinates must lie inside image 1.");
+      }
+      return { name: String(name).trim(), x, y };
+    });
+  }
 
-    Swal.fire({
-      title: "Insert object column name",
-      input: "text",
-      inputValue: columnName,
-      showCancelButton: true,
-      confirmButtonText: "Next",
-      cancelButtonText: "Cancel",
-      buttonsStyling: false,
-      customClass: {
-        confirmButton: "btn btn-primary me-3",
-        cancelButton: "btn btn-secondary",
-      },
-    }).then((result) => {
-      let columnName = result.value;
-      Swal.fire({
-        title: "Insert default image 1 & 2 tolerance",
+  async importSegments(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    try {
+      const columnResult = await Swal.fire({
+        title: "Insert object column name",
         input: "text",
-        inputValue: defaultTolerance.ppl + "," + defaultTolerance.xpl,
+        inputValue: "descr",
         showCancelButton: true,
         confirmButtonText: "Next",
         cancelButtonText: "Cancel",
@@ -1642,252 +1647,135 @@ class ThinAnalyser {
           confirmButton: "btn btn-primary me-3",
           cancelButton: "btn btn-secondary",
         },
-      }).then((defaultTolerances) => {
-        defaultTolerances = defaultTolerances.split(",");
-        defaultTolerance = {
-          ppl: defaultTolerances[0],
-          xpl: defaultTolerances[1],
-        };
-
-        let reader = new FileReader();
-
-        reader.readAsText(file);
-        reader.onload = (e) => {
-          let points = [];
-
-          let json = JSON.parse(e.target.result);
-
-          json.features.forEach((feature) => {
-            let x = Math.abs(Math.round(feature.geometry.coordinates[0]));
-            let y = Math.abs(Math.round(feature.geometry.coordinates[1]));
-
-            points.push({
-              name: feature.properties[columnName],
-              x: x,
-              y: y,
-            });
-          });
-
-          Swal.fire({
-            title: "Are you sure?",
-            text: "Do you really want to import object names and colors? The current objects will be overwritten.",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonText: "Yes",
-            cancelButtonText: "Cancel",
-            buttonsStyling: false,
-            customClass: {
-              confirmButton: "btn btn-primary me-3",
-              cancelButton: "btn btn-secondary",
-            },
-          }).then((result) => {
-            if (result.isConfirmed) {
-              this.trainingPoints = points;
-
-              let newObjects = {};
-
-              this.imgData.ppl = this.pplPreviewCtx.getImageData(
-                0,
-                0,
-                this.pplPreviewCanvas.width,
-                this.pplPreviewCanvas.height
-              );
-              this.imgData.xpl = this.xplPreviewCtx.getImageData(
-                0,
-                0,
-                this.pplPreviewCanvas.width,
-                this.pplPreviewCanvas.height
-              );
-
-              points.forEach((object) => {
-                object.x += this.margin.left;
-                object.y += this.margin.top;
-
-                const objectColor = {
-                  ppl: this.getColorFromPosition(
-                    this.imgData.ppl,
-                    object.x,
-                    object.y
-                  ),
-                  xpl: this.getColorFromPosition(
-                    this.imgData.xpl,
-                    object.x,
-                    object.y
-                  ),
-                };
-
-                if (typeof newObjects[this.object.name] == "undefined") {
-                  newObjects[this.object.name] = {
-                    obj_name: this.object.name,
-                    ppl_color_target_1: objectColor.ppl,
-                    ppl_tolerance_1: defaultTolerance.ppl,
-                    xpl_color_target_1: objectColor.xpl,
-                    xpl_tolerance_1: defaultTolerance.xpl,
-                    max_colors: 1,
-                    render_color:
-                      "#" + Math.floor(Math.random() * 16777215).toString(16),
-                  };
-                } else {
-                  let close = false;
-                  let objectColorLab = {
-                    ppl: this.rgb2lab(this.hexToRgb(objectColor.ppl)),
-                    xpl: this.rgb2lab(this.hexToRgb(objectColor.xpl)),
-                  };
-
-                  for (
-                    let i = 0;
-                    i < newObjects[this.object.name].max_colors;
-                    i += 1
-                  ) {
-                    let otherColor = {
-                      ppl: this.rgb2lab(
-                        this.hexToRgb(
-                          newObjects[this.object.name][
-                            "ppl_color_target_" + (i + 1)
-                          ]
-                        )
-                      ),
-                      xpl: this.rgb2lab(
-                        this.hexToRgb(
-                          newObjects[this.object.name][
-                            "xpl_color_target_" + (i + 1)
-                          ]
-                        )
-                      ),
-                    };
-                    let deltaPpl = this.deltaE(
-                      otherColor.ppl,
-                      objectColorLab.ppl
-                    );
-                    let deltaXpl = this.deltaE(
-                      otherColor.xpl,
-                      objectColorLab.xpl
-                    );
-
-                    if (
-                      defaultTolerance.ppl >= deltaPpl &&
-                      defaultTolerance.xpl >= deltaXpl
-                    )
-                      close = true;
-                  }
-
-                  if (!close) {
-                    let colorIndex =
-                      newObjects[this.object.name].this.max_colors + 1;
-                    newObjects[this.object.name].max_colors = colorIndex;
-                    newObjects[this.object.name][
-                      "ppl_color_target_" + colorIndex
-                    ] = this.objectColor.this.ppl;
-                    newObjects[this.object.name][
-                      "xpl_color_target_" + colorIndex
-                    ] = this.objectColor.this.xpl;
-                    newObjects[this.object.name][
-                      "ppl_tolerance_" + colorIndex
-                    ] = defaultTolerance.this.ppl;
-                    newObjects[this.object.name][
-                      "xpl_tolerance_" + colorIndex
-                    ] = defaultTolerance.this.xpl;
-                  }
-                }
-              });
-
-              this.objects = [];
-              for (let i in newObjects) {
-                this.objects.push(newObjects[i]);
-              }
-
-              this.selectedObject = 1;
-              this.maxObjects = this.objects.length;
-
-              this.setInputsFromObject(this.selectedObject);
-
-              document.getElementById("obj_max").innerHTML = this.maxObjects;
-              document.getElementById("obj_max_2").innerHTML = this.maxObjects;
-              document.getElementById("obj_selected").innerHTML =
-                this.selectedObject;
-
-              if (this.maxObjects > 1) {
-                document.getElementById("next_obj").style.opacity = "1";
-                document.getElementById("remove_obj").style.opacity = "1";
-              }
-
-              Swal.fire({
-                text: this.maxObjects + " objects imported",
-                icon: "success",
-                timer: 3000,
-                showConfirmButton: false,
-              });
-            }
-          });
-        };
       });
-    });
+      if (!columnResult.isConfirmed) return;
+      const columnName = String(columnResult.value || "").trim();
+      const toleranceResult = await Swal.fire({
+        title: "Insert default image 1 & 2 tolerance",
+        input: "text",
+        inputValue: "15,15",
+        showCancelButton: true,
+        confirmButtonText: "Next",
+        cancelButtonText: "Cancel",
+        buttonsStyling: false,
+        customClass: {
+          confirmButton: "btn btn-primary me-3",
+          cancelButton: "btn btn-secondary",
+        },
+      });
+      if (!toleranceResult.isConfirmed) return;
+      const toleranceValues = String(toleranceResult.value || "").split(",");
+      const tolerances = toleranceValues.map((value) => Number(value.trim()));
+      if (tolerances.length !== 2 || toleranceValues.some((value) => !value.trim()) ||
+          tolerances.some((value) => !Number.isFinite(value) || value < 0 || value > 100)) {
+        throw new Error("Enter two numeric tolerances between 0 and 100, separated by a comma.");
+      }
+      const points = this.getGeoJsonPoints(JSON.parse(await file.text()), columnName);
+      const result = await Swal.fire({
+        title: "Are you sure?",
+        text: "Do you really want to import object names and colors? The current objects will be overwritten.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes",
+        cancelButtonText: "Cancel",
+        buttonsStyling: false,
+        customClass: {
+          confirmButton: "btn btn-primary me-3",
+          cancelButton: "btn btn-secondary",
+        },
+      });
+      if (!result.isConfirmed) return;
+
+      const imageData = {
+        ppl: this.pplPreviewCtx.getImageData(0, 0, this.pplPreviewCanvas.width, this.pplPreviewCanvas.height),
+        xpl: this.xplPreviewCtx.getImageData(0, 0, this.xplPreviewCanvas.width, this.xplPreviewCanvas.height),
+      };
+      const newObjects = new Map();
+      for (const point of points) {
+        const offsetX = point.x + this.margin.offsetX;
+        const offsetY = point.y + this.margin.offsetY;
+        if (offsetX < 0 || offsetY < 0 || offsetX >= this.xplPreviewCanvas.width || offsetY >= this.xplPreviewCanvas.height) {
+          throw new Error("A reference point lies outside image 2 after applying its offset.");
+        }
+        const colors = {
+          ppl: this.getColorFromPosition(imageData.ppl, point.x, point.y),
+          xpl: this.getColorFromPosition(imageData.xpl, offsetX, offsetY),
+        };
+        if (!newObjects.has(point.name)) {
+          newObjects.set(point.name, {
+            ...this.getDefaultObject(point.name),
+            ppl_color_target_1: colors.ppl,
+            xpl_color_target_1: colors.xpl,
+            ppl_tolerance_1: tolerances[0],
+            xpl_tolerance_1: tolerances[1],
+          });
+          continue;
+        }
+        const object = newObjects.get(point.name);
+        const labColors = {
+          ppl: this.rgb2lab(this.hexToRgb(colors.ppl)),
+          xpl: this.rgb2lab(this.hexToRgb(colors.xpl)),
+        };
+        let close = false;
+        for (let colorIndex = 1; colorIndex <= object.max_colors; colorIndex++) {
+          const deltaPpl = this.deltaE(this.rgb2lab(this.hexToRgb(object["ppl_color_target_" + colorIndex])), labColors.ppl);
+          const deltaXpl = this.deltaE(this.rgb2lab(this.hexToRgb(object["xpl_color_target_" + colorIndex])), labColors.xpl);
+          if (deltaPpl <= tolerances[0] && deltaXpl <= tolerances[1]) close = true;
+        }
+        if (!close) {
+          const colorIndex = ++object.max_colors;
+          object["ppl_color_target_" + colorIndex] = colors.ppl;
+          object["xpl_color_target_" + colorIndex] = colors.xpl;
+          object["ppl_tolerance_" + colorIndex] = tolerances[0];
+          object["xpl_tolerance_" + colorIndex] = tolerances[1];
+        }
+      }
+
+      this.objects = Array.from(newObjects.values());
+      this.trainingPoints = points;
+      this.selectedObject = 1;
+      this.maxObjects = this.objects.length;
+      this.setInputsFromObject(this.selectedObject);
+      document.getElementById("obj_max").innerHTML = this.maxObjects;
+      document.getElementById("obj_max_2").innerHTML = this.maxObjects;
+      document.getElementById("obj_selected").innerHTML = this.selectedObject;
+      document.getElementById("prev_obj").style.opacity = "0.5";
+      document.getElementById("next_obj").style.opacity = this.maxObjects > 1 ? "1" : "0.5";
+      document.getElementById("remove_obj").style.opacity = this.maxObjects > 1 ? "1" : "0.5";
+      Swal.fire({ text: this.maxObjects + " objects imported", icon: "success", timer: 3000, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ text: error.message, icon: "error" });
+    }
   }
 
-  importPoints(event) {
-    let file = event.target.files[0];
-    let columnName = "descr";
+  async importPoints(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
-    if (!file) {
-      return;
+    try {
+      const result = await Swal.fire({
+        title: "Insert object column name",
+        input: "text",
+        inputValue: "descr",
+        showCancelButton: true,
+        confirmButtonText: "Confirm",
+        cancelButtonText: "Cancel",
+        buttonsStyling: false,
+        customClass: {
+          confirmButton: "btn btn-primary me-3",
+          cancelButton: "btn btn-secondary",
+        },
+      });
+      if (!result.isConfirmed) return;
+      const columnName = String(result.value || "").trim();
+      const points = this.getGeoJsonPoints(JSON.parse(await file.text()), columnName);
+      this.comparisonPoints = points;
+      this.drawPoints(points);
+      document.getElementById("render_segment_color_container").style.display = "block";
+      Swal.fire({ text: points.length + " points imported", icon: "success", timer: 3000, showConfirmButton: false });
+    } catch (error) {
+      Swal.fire({ text: error.message, icon: "error" });
     }
-
-    Swal.fire({
-      title: "Insert object column name",
-      input: "text",
-      inputValue: columnName,
-      showCancelButton: true,
-      confirmButtonText: "Confirm",
-      cancelButtonText: "Cancel",
-      buttonsStyling: false,
-      customClass: {
-        confirmButton: "btn btn-primary me-3",
-        cancelButton: "btn btn-secondary",
-      },
-    }).then((columnName) => {
-      if (columnName) {
-        let reader = new FileReader();
-
-        reader.readAsText(file);
-        reader.onload = (e) => {
-          let points = [];
-
-          let json = JSON.parse(e.target.result);
-
-          json.features.forEach((feature) => {
-            let x = Math.abs(Math.round(feature.geometry.coordinates[0]));
-            let y = Math.abs(Math.round(feature.geometry.coordinates[1]));
-
-            if (this.customWidth) {
-              x = Math.round(x * (this.customWidth / this.originalSize.width));
-              y = Math.round(y * (this.customWidth / this.originalSize.width));
-            }
-
-            points.push({
-              name: feature.properties[columnName],
-              x,
-              y,
-            });
-          });
-
-          this.comparisonPoints = points;
-
-          this.drawPoints(this.comparisonPoints);
-
-          Swal.fire({
-            text: this.comparisonPoints.length + " points imported",
-            icon: "success",
-            timer: 3000,
-            showConfirmButton: false,
-          });
-
-          if (this.comparisonPoints.length)
-            document.getElementById(
-              "render_segment_color_container"
-            ).renderSegmentColorContainer.style.display = "block";
-        };
-      }
-    });
   }
 
   /* BUTTONS */
@@ -1935,10 +1823,8 @@ class ThinAnalyser {
     }
   }
 
-  addObjBtn() {
-    this.maxObjects += 1;
-
-    const data = {
+  getDefaultObject(name) {
+    return {
       ppl_color_target: [],
       xpl_color_target: [],
       ppl_tolerance: [],
@@ -1958,11 +1844,16 @@ class ThinAnalyser {
       max_aspect_ratio: 1,
       min_major_axis_angle: -90,
       max_major_axis_angle: 90,
-      obj_name: "Nameless " + this.maxObjects,
+      obj_name: name,
       render_color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
       render_mode: "fill",
       render_segment_color: "#ff0000",
     };
+  }
+
+  addObjBtn() {
+    this.maxObjects += 1;
+    const data = this.getDefaultObject("Nameless " + this.maxObjects);
 
     this.setObject(this.maxObjects, data);
 
