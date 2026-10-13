@@ -758,10 +758,12 @@ class ThinAnalyser {
             minorAxis.length = 0;
             let sum_x = 0;
             let sum_y = 0;
+            for (const point of segment.areaPixels) {
+              sum_x += point[0];
+              sum_y += point[1];
+            }
             for (let i = 0; i < segment.perimeterPixels.length; i += 1) {
               let posXY1 = segment.perimeterPixels[i];
-              sum_x += segment.perimeterPixels[i][0];
-              sum_y += segment.perimeterPixels[i][1];
               for (let i2 = i; i2 < segment.perimeterPixels.length; i2 += 1) {
                 let posXY2 = segment.perimeterPixels[i2];
                 if (i !== i2) {
@@ -791,8 +793,8 @@ class ThinAnalyser {
             let aspectRatio = minorAxis.length / majorAxis.length;
 
             let centroid = {};
-            centroid.x = Math.round(sum_x / segment.perimeterPixels.length);
-            centroid.y = Math.round(sum_y / segment.perimeterPixels.length);
+            centroid.x = sum_x / area;
+            centroid.y = sum_y / area;
 
             if (
               majorAxis.angle >= this.object.min_major_axis_angle &&

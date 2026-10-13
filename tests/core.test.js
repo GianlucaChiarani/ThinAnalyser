@@ -95,3 +95,49 @@ test("perimeter of a full image includes the bottom-left edge", () => {
   }
   assert.equal(createSegment(points, 3, 3).perimeterPixels.length, 12);
 });
+
+function filterSegments(segments, object = {}, overrides = {}) {
+  const analyser = createAnalyser({
+    object: {
+      obj_name: "test",
+      min_area: 1,
+      max_area: Infinity,
+      min_compactness: 0,
+      max_compactness: 1,
+      min_convexity: 0,
+      max_convexity: 1,
+      min_aspect_ratio: 0,
+      max_aspect_ratio: 1,
+      min_major_axis_angle: -90,
+      max_major_axis_angle: 90,
+      ...object,
+    },
+    ...overrides,
+  });
+  analyser.segments[1] = segments;
+  analyser.filtered[1] = [];
+  analyser.validPixels[1] = 0;
+  analyser.filtering(1, 0, segments.length, 100);
+  return analyser;
+}
+
+test("centroid uses all area pixels and preserves fractional coordinates", () => {
+  const points = [];
+  for (let row = 5; row < 15; row++) {
+    for (let column = 5; column < 15; column++) points.push([column, row]);
+  }
+  for (let column = 15; column < 35; column++) points.push([column, 5]);
+  const analyser = filterSegments([createSegment(points)]);
+
+  assert.equal(analyser.filtered[1].length, 1);
+  assert.equal(analyser.filtered[1][0].centroid.x, 12);
+  assert.equal(analyser.filtered[1][0].centroid.y, 8.75);
+});
+
+test("centroid adds crop margins exactly once", () => {
+  const segment = createSegment([[5, 5], [6, 5], [5, 6], [6, 6]]);
+  const analyser = filterSegments([segment], {}, { margin: { left: 10, top: 20 } });
+
+  assert.equal(analyser.filtered[1][0].centroid.x, 15.5);
+  assert.equal(analyser.filtered[1][0].centroid.y, 25.5);
+});
