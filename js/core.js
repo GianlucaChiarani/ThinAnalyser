@@ -679,7 +679,8 @@ class ThinAnalyser {
 
     for (
       let start = 0;
-      start <= this.segments[currentObject].length;
+      start < this.segments[currentObject].length ||
+      (start === 0 && this.segments[currentObject].length === 0);
       start += step
     ) {
       let end;
@@ -946,10 +947,14 @@ class ThinAnalyser {
           .replace("aspectRatio", "aspect_ratio")
           .replace("majorAxisAngle", "major_axis_angle");
         const values = this.filtered[currentObject].map((segment) => segment.stats[statName]);
-        document.querySelector("#min_" + statNameS).value =
-          math.min(values);
-        document.querySelector("#max_" + statNameS).value =
-          math.max(values);
+        this.object["min_" + statNameS] = math.min(values);
+        this.object["max_" + statNameS] = math.max(values);
+        if (currentObject === this.selectedObject) {
+          document.querySelector("#min_" + statNameS).value =
+            this.object["min_" + statNameS];
+          document.querySelector("#max_" + statNameS).value =
+            this.object["max_" + statNameS];
+        }
       }
 
       this.addLog("object '" + this.object.obj_name + "' trained");

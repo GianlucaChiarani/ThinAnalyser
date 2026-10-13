@@ -97,7 +97,7 @@ test("perimeter of a full image includes the bottom-left edge", () => {
   assert.equal(createSegment(points, 3, 3).perimeterPixels.length, 12);
 });
 
-function filterSegments(segments, object = {}, overrides = {}) {
+function filterSegments(segments, object = {}, overrides = {}, globals = {}) {
   const analyser = createAnalyser({
     object: {
       obj_name: "test",
@@ -114,7 +114,7 @@ function filterSegments(segments, object = {}, overrides = {}) {
       ...object,
     },
     ...overrides,
-  });
+  }, globals);
   analyser.segments[1] = segments;
   analyser.filtered[1] = [];
   analyser.validPixels[1] = 0;
@@ -281,6 +281,42 @@ test("training with no matching segment yields empty results instead of all segm
   assert.equal(analyser.comparisonValidPoints[1].length, 0);
   assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 0);
   assert.deepEqual(Object.keys(analyser.stats[1]), []);
+});
+
+test("chunked filtering completes exactly once for any segment count", () => {
+  for (const count of [0, 1, 500, 1000, 1001]) {
+    let completions = 0;
+    const timers = [];
+    const analyser = createAnalyser({}, { setTimeout: (callback, delay, ...args) => timers.push(() => callback(...args)) });
+    Object.assign(analyser, {
+      object: { obj_name: "test", min_area: 0, max_area: 0 },
+      prepareResults() { completions += 1; },
+      rendering() {},
+    });
+    analyser.segments[1] = Array.from({ length: count }, () => ({ areaPixels: [[0, 0]], perimeterPixels: [] }));
+    analyser.filtered[1] = [];
+    analyser.preFiltering(1);
+    while (timers.length) timers.shift()();
+    assert.equal(completions, 1, "segments: " + count);
+  }
+});
+
+test("training stores thresholds on the processed object, not the selected form", () => {
+  for (const selectedObject of [1, 2]) {
+    const form = new Map();
+    const getElement = (selector) => {
+      if (!form.has(selector)) form.set(selector, { style: {}, value: "unchanged" });
+      return form.get(selector);
+    };
+    const analyser = filterSegments([createSegment(rectanglePoints(3, 3))], { render_color: "#ff0000" }, { trainingPoints: [{ x: 5, y: 5 }], selectedObject, maxObjects: 2 }, { document: { getElementById: getElement, querySelector: getElement } });
+    analyser.objects = [analyser.object, {}];
+    analyser.imgData = { ppl: { data: new Uint8ClampedArray(50 * 40 * 4) }, xpl: { data: new Uint8ClampedArray(50 * 40 * 4) } };
+    analyser.totalPixels = 50 * 40;
+    analyser.rendering(1);
+    assert.equal(analyser.objects[0].min_area, 9);
+    assert.equal(analyser.objects[0].max_area, 9);
+    assert.equal(getElement("#min_area").value, selectedObject === 1 ? 9 : "unchanged");
+  }
 });
 
 test("new objects have complete parameters before their controls are opened", () => {
