@@ -1252,7 +1252,7 @@ class ThinAnalyser {
     }
 
     if (
-      pixelPosBottom <=
+      pixelPosBottom <
       this.pplCroppedCanvas.width * this.pplCroppedCanvas.height
     ) {
       if (this.imgDataMaskB[pixelPosBottom] == false) {

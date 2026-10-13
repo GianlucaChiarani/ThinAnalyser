@@ -60,3 +60,38 @@ test("RGB cache distinguishes previously colliding colors", () => {
   assert.ok(analyser.deltaE(labA, labB) > 11);
   assert.equal(analyser.rgb2lab(colorA), labA);
 });
+
+function createSegment(points, width = 50, height = 40) {
+  const analyser = createAnalyser({
+    pplCroppedCanvas: { width, height },
+    imgDataMask: Array(width * height).fill(false),
+    imgDataMaskB: Array(width * height).fill(false),
+    segmentAreaPixels: [],
+    segmentPerimeterPixels: [],
+  });
+  for (const [column, row] of points) {
+    analyser.imgDataMaskB[row * width + column] = true;
+  }
+  for (const [column, row] of points) {
+    analyser.addPixel(row * width + column, column, row);
+  }
+  return {
+    areaPixels: analyser.segmentAreaPixels,
+    perimeterPixels: analyser.segmentPerimeterPixels,
+  };
+}
+
+test("perimeter counts all four edges of isolated pixels, including image borders", () => {
+  for (const [column, row] of [[0, 0], [2, 0], [0, 2], [2, 2], [1, 1]]) {
+    const segment = createSegment([[column, row]], 3, 3);
+    assert.equal(segment.perimeterPixels.length, 4, `pixel ${column},${row}`);
+  }
+});
+
+test("perimeter of a full image includes the bottom-left edge", () => {
+  const points = [];
+  for (let row = 0; row < 3; row++) {
+    for (let column = 0; column < 3; column++) points.push([column, row]);
+  }
+  assert.equal(createSegment(points, 3, 3).perimeterPixels.length, 12);
+});
