@@ -141,3 +141,43 @@ test("centroid adds crop margins exactly once", () => {
   assert.equal(analyser.filtered[1][0].centroid.x, 15.5);
   assert.equal(analyser.filtered[1][0].centroid.y, 25.5);
 });
+
+function rectanglePoints(width, height) {
+  const points = [];
+  for (let row = 5; row < height + 5; row++) {
+    for (let column = 5; column < width + 5; column++) points.push([column, row]);
+  }
+  return points;
+}
+
+test("principal axes give a 10x3 rectangle aspect ratio 0.3", () => {
+  const analyser = filterSegments([createSegment(rectanglePoints(10, 3))], {
+    min_aspect_ratio: 0.29,
+    max_aspect_ratio: 0.31,
+  });
+  assert.equal(analyser.filtered[1].length, 1);
+  const stats = analyser.filtered[1][0].stats;
+  assert.ok(Math.abs(stats.aspectRatio - 0.3) < 1e-12);
+  assert.equal(stats.majorAxisAngle, 0);
+});
+
+test("principal axes handle vertical rectangles, squares and single pixels", () => {
+  for (const [width, height, expectedRatio, expectedAngle] of [[3, 10, 0.3, -90], [5, 5, 1, 0], [1, 1, 1, 0]]) {
+    const analyser = filterSegments([createSegment(rectanglePoints(width, height))]);
+    assert.equal(analyser.filtered[1].length, 1);
+    const stats = analyser.filtered[1][0].stats;
+    assert.ok(Math.abs(stats.aspectRatio - expectedRatio) < 1e-12);
+    assert.equal(stats.majorAxisAngle, expectedAngle);
+    assert.equal(Math.abs(stats.minorAxisAngle - stats.majorAxisAngle), 90);
+  }
+});
+
+test("principal axes preserve oblique angles without integer rounding", () => {
+  const points = [[5, 5], [6, 6], [7, 6], [8, 7], [9, 7], [10, 8]];
+  const analyser = filterSegments([createSegment(points)]);
+  assert.equal(analyser.filtered[1].length, 1);
+  const stats = analyser.filtered[1][0].stats;
+  assert.ok(stats.majorAxisAngle > -40 && stats.majorAxisAngle < -20);
+  assert.notEqual(stats.majorAxisAngle, Math.round(stats.majorAxisAngle));
+  assert.ok(stats.aspectRatio > 0 && stats.aspectRatio < 1);
+});

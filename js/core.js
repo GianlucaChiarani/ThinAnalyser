@@ -727,80 +727,20 @@ class ThinAnalyser {
             convexity >= this.object.min_convexity &&
             convexity <= this.object.max_convexity
           ) {
-            let majorAxis = {};
-            majorAxis.length = 0;
-            convexHull.sort(this.sortfirst);
-            for (let i = 0; i < convexHull.length; i += 1) {
-              let posXY1 = convexHull[i];
-              for (let i2 = i; i2 < convexHull.length; i2 += 1) {
-                let posXY2 = convexHull[i2];
-                if (i !== i2) {
-                  let length = this.getDistance(posXY1, posXY2);
-                  if (length > majorAxis.length) {
-                    majorAxis.length = length;
-                    majorAxis.x1 = posXY1[0];
-                    majorAxis.x2 = posXY2[0];
-                    majorAxis.y1 = posXY1[1];
-                    majorAxis.y2 = posXY2[1];
-                  }
-                }
-              }
-            }
-
-            majorAxis.angle = Math.atan2(
-              -(majorAxis.y2 - majorAxis.y1),
-              majorAxis.x2 - majorAxis.x1
-            );
-
-            majorAxis.angle = Math.round((majorAxis.angle * 180) / Math.PI);
-
-            let minorAxis = {};
-            minorAxis.length = 0;
             let sum_x = 0;
             let sum_y = 0;
             for (const point of segment.areaPixels) {
               sum_x += point[0];
               sum_y += point[1];
             }
-            for (let i = 0; i < segment.perimeterPixels.length; i += 1) {
-              let posXY1 = segment.perimeterPixels[i];
-              for (let i2 = i; i2 < segment.perimeterPixels.length; i2 += 1) {
-                let posXY2 = segment.perimeterPixels[i2];
-                if (i !== i2) {
-                  let length = this.getDistance(posXY1, posXY2);
-                  if (length > minorAxis.length) {
-                    minorAxis.angle = Math.atan2(
-                      -(posXY2[1] - posXY1[1]),
-                      posXY2[0] - posXY1[0]
-                    );
-                    minorAxis.angle = Math.round(
-                      (minorAxis.angle * 180) / Math.PI
-                    );
-                    if (
-                      minorAxis.angle == majorAxis.angle + 90 ||
-                      minorAxis.angle == majorAxis.angle - 90
-                    ) {
-                      minorAxis.length = length;
-                      minorAxis.x1 = posXY1[0];
-                      minorAxis.x2 = posXY2[0];
-                      minorAxis.y1 = posXY1[1];
-                      minorAxis.y2 = posXY2[1];
-                    }
-                  }
-                }
-              }
-            }
-            let aspectRatio = minorAxis.length / majorAxis.length;
-
-            let centroid = {};
-            centroid.x = sum_x / area;
-            centroid.y = sum_y / area;
+            const centroid = { x: sum_x / area, y: sum_y / area };
+            const axes = this.getPrincipalAxes(segment.areaPixels, centroid);
 
             if (
-              majorAxis.angle >= this.object.min_major_axis_angle &&
-              majorAxis.angle <= this.object.max_major_axis_angle &&
-              aspectRatio >= this.object.min_aspect_ratio &&
-              aspectRatio <= this.object.max_aspect_ratio
+              axes.majorAxisAngle >= this.object.min_major_axis_angle &&
+              axes.majorAxisAngle <= this.object.max_major_axis_angle &&
+              axes.aspectRatio >= this.object.min_aspect_ratio &&
+              axes.aspectRatio <= this.object.max_aspect_ratio
             ) {
               this.filtered[currentObject].push({
                 id:
@@ -818,9 +758,9 @@ class ThinAnalyser {
                   area,
                   compactness,
                   convexity,
-                  aspectRatio,
-                  minorAxisAngle: minorAxis.angle,
-                  majorAxisAngle: majorAxis.angle,
+                  aspectRatio: axes.aspectRatio,
+                  minorAxisAngle: axes.minorAxisAngle,
+                  majorAxisAngle: axes.majorAxisAngle,
                 },
               });
 
@@ -1291,6 +1231,35 @@ class ThinAnalyser {
     return Math.sqrt(
       (a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1])
     );
+  }
+
+  getPrincipalAxes(points, centroid) {
+    let varianceX = 0;
+    let varianceY = 0;
+    let covariance = 0;
+    for (const point of points) {
+      const offsetX = point[0] - centroid.x;
+      const offsetY = centroid.y - point[1];
+      varianceX += offsetX * offsetX;
+      varianceY += offsetY * offsetY;
+      covariance += offsetX * offsetY;
+    }
+    varianceX = varianceX / points.length + 1 / 12;
+    varianceY = varianceY / points.length + 1 / 12;
+    covariance /= points.length;
+
+    const trace = varianceX + varianceY;
+    const difference = Math.hypot(varianceX - varianceY, 2 * covariance);
+    const majorVariance = (trace + difference) / 2;
+    const minorVariance = Math.max(1 / 12, (trace - difference) / 2);
+    let majorAxisAngle = (Math.atan2(2 * covariance, varianceX - varianceY) * 90) / Math.PI;
+    if (majorAxisAngle >= 90) majorAxisAngle -= 180;
+
+    return {
+      aspectRatio: Math.sqrt(minorVariance / majorVariance),
+      majorAxisAngle,
+      minorAxisAngle: majorAxisAngle < 0 ? majorAxisAngle + 90 : majorAxisAngle - 90,
+    };
   }
 
   cross(a, b, o) {
