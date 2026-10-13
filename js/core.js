@@ -65,6 +65,7 @@ class ThinAnalyser {
     this.xplColorTargetLab = null;
 
     this.imgData = { ppl: null, xpl: null };
+    this.sourceImgData = { ppl: null, xpl: null };
     this.imgDataMask = null;
     this.imgDataMaskB = null;
     this.imgDataMaskAll = null;
@@ -414,6 +415,10 @@ class ThinAnalyser {
       this.xplCroppedCanvas.width,
       this.xplCroppedCanvas.height
     );
+    this.sourceImgData = {
+      ppl: new Uint8ClampedArray(this.imgData.ppl.data),
+      xpl: new Uint8ClampedArray(this.imgData.xpl.data),
+    };
     this.totalPixels =
       this.pplCroppedCanvas.width * this.pplCroppedCanvas.height;
 
@@ -521,15 +526,15 @@ class ThinAnalyser {
     for (let i = start; i < end; i += 4) {
       if (typeof this.imgDataMaskAll[i / 4] == "undefined") {
         color1 = {
-          r: this.imgData.ppl.data[i],
-          g: this.imgData.ppl.data[i + 1],
-          b: this.imgData.ppl.data[i + 2],
+          r: this.sourceImgData.ppl[i],
+          g: this.sourceImgData.ppl[i + 1],
+          b: this.sourceImgData.ppl[i + 2],
         };
 
         color2 = {
-          r: this.imgData.xpl.data[i],
-          g: this.imgData.xpl.data[i + 1],
-          b: this.imgData.xpl.data[i + 2],
+          r: this.sourceImgData.xpl[i],
+          g: this.sourceImgData.xpl[i + 1],
+          b: this.sourceImgData.xpl[i + 2],
         };
 
         color1 = this.rgb2lab(color1);
@@ -772,10 +777,20 @@ class ThinAnalyser {
     }
 
     if (end == this.segments[currentObject].length) {
+      this.prepareResults(currentObject);
       this.updateStatus(currentObject, "Rendering...", 0);
       setTimeout(this.rendering.bind(this), 1, currentObject);
     } else {
       this.updateStatus(currentObject, "Filtering...", perc);
+    }
+  }
+
+  prepareResults(currentObject) {
+    for (const segment of this.filtered[currentObject]) {
+      for (const point of segment.areaPixels) {
+        const position = point[1] * this.pplCroppedCanvas.width + point[0];
+        this.imgDataMaskAll[position] = true;
+      }
     }
   }
 
@@ -804,7 +819,6 @@ class ThinAnalyser {
 
           const pos =
             point[1] * (this.pplCroppedCanvas.width * 4) + point[0] * 4;
-          this.imgDataMaskAll[pos / 4] = true;
 
           this.imgData.ppl.data[pos] = renderColorRgb.r;
           this.imgData.ppl.data[pos + 1] = renderColorRgb.g;

@@ -32,6 +32,7 @@ function createAnalyser(overrides = {}, globals = {}) {
     validPixels: [],
     stats: [],
     statsProperties: ["area", "compactness", "convexity", "aspectRatio", "majorAxisAngle"],
+    pplCroppedCanvas: { width: 50, height: 40 },
     comparisonPoints: [],
     trainingPoints: [],
     comparisonValidPoints: [],
@@ -180,4 +181,70 @@ test("principal axes preserve oblique angles without integer rounding", () => {
   assert.ok(stats.majorAxisAngle > -40 && stats.majorAxisAngle < -20);
   assert.notEqual(stats.majorAxisAngle, Math.round(stats.majorAxisAngle));
   assert.ok(stats.aspectRatio > 0 && stats.aspectRatio < 1);
+});
+
+function renderSegmentCase(mode, comparisonPoints = [], trainingPoints = []) {
+  const analyser = filterSegments([createSegment(rectanglePoints(3, 3))], {
+    render_mode: mode,
+    render_color: "#ff0000",
+    render_segment_color: "#00ff00",
+  }, { comparisonPoints, trainingPoints });
+  const pixels = new Uint8ClampedArray(50 * 40 * 4).fill(100);
+  analyser.imgData = {
+    ppl: { data: pixels.slice() },
+    xpl: { data: pixels.slice() },
+  };
+  analyser.sourceImgData = { ppl: pixels.slice(), xpl: pixels.slice() };
+  analyser.totalPixels = 50 * 40;
+  analyser.comparisonValidPoints[1] = [];
+  analyser.filteredTrainingPoints[1] = [];
+  analyser.rendering(1);
+  return analyser;
+}
+
+test("render modes claim identical segment pixels before drawing", () => {
+  const fill = renderSegmentCase("fill");
+  const border = renderSegmentCase("only_border");
+  assert.deepEqual(fill.imgDataMaskAll, border.imgDataMaskAll);
+  assert.equal(fill.imgDataMaskAll.filter(Boolean).length, 9);
+  assert.equal(border.imgData.ppl.data[(6 * 50 + 6) * 4], 100);
+  assert.equal(fill.imgData.ppl.data[(6 * 50 + 6) * 4], 255);
+});
+
+test("render highlighting cannot leave the exclusion mask incomplete", () => {
+  const analyser = renderSegmentCase("fill", [{ name: "test", x: 5, y: 5 }]);
+  assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 9);
+});
+
+test("render colors never replace source colors used by comparison", () => {
+  const analyser = renderSegmentCase("fill");
+  analyser.imgDataMaskAll = [];
+  analyser.imgDataMask = [];
+  analyser.object.max_colors = 1;
+  analyser.object.ppl_tolerance_1 = 0;
+  analyser.object.xpl_tolerance_1 = 0;
+  const target = analyser.rgb2lab({ r: 100, g: 100, b: 100 });
+  analyser.pplColorTargetLab = [target];
+  analyser.xplColorTargetLab = [target];
+  analyser.comparison(1, 0, analyser.imgData.ppl.data.length, 100);
+
+  assert.equal(analyser.imgDataMask.filter(Boolean).length, 50 * 40);
+  assert.equal(analyser.sourceImgData.ppl[(5 * 50 + 5) * 4], 100);
+});
+
+test("start snapshots source pixels independently of rendering buffers", () => {
+  const getImageData = () => ({ data: new Uint8ClampedArray(16).fill(100) });
+  const analyser = createAnalyser({
+    pplCroppedCanvas: { width: 2, height: 2 },
+    xplCroppedCanvas: { width: 2, height: 2 },
+    pplCroppedCtx: { getImageData },
+    xplCroppedCtx: { getImageData },
+    imgData: {},
+    setObjectFromInputs() {},
+  });
+  analyser.start();
+  analyser.imgData.ppl.data[0] = 255;
+  analyser.imgData.xpl.data[0] = 0;
+  assert.equal(analyser.sourceImgData.ppl[0], 100);
+  assert.equal(analyser.sourceImgData.xpl[0], 100);
 });
