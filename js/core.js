@@ -1954,12 +1954,14 @@ class ThinAnalyser {
       max_compactness: 1,
       min_convexity: 0,
       max_convexity: 1,
-      min_aspectRatio: 0,
+      min_aspect_ratio: 0,
       max_aspect_ratio: 1,
       min_major_axis_angle: -90,
       max_major_axis_angle: 90,
       obj_name: "Nameless " + this.maxObjects,
-      render_color: "#" + Math.floor(Math.random() * 16777215).toString(16),
+      render_color: "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"),
+      render_mode: "fill",
+      render_segment_color: "#ff0000",
     };
 
     this.setObject(this.maxObjects, data);

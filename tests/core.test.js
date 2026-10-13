@@ -282,3 +282,21 @@ test("training with no matching segment yields empty results instead of all segm
   assert.equal(analyser.imgDataMaskAll.filter(Boolean).length, 0);
   assert.deepEqual(Object.keys(analyser.stats[1]), []);
 });
+
+test("new objects have complete parameters before their controls are opened", () => {
+  const analyser = createAnalyser();
+  analyser.addObjBtn();
+  const object = analyser.getObject(2);
+  assert.equal(object.min_aspect_ratio, 0);
+  assert.equal(object.render_mode, "fill");
+  assert.match(object.render_segment_color, /^#[0-9a-f]{6}$/i);
+  assert.equal(filterSegments([createSegment(rectanglePoints(10, 3))], object).filtered[1].length, 1);
+});
+
+test("new object render colors retain all six hexadecimal digits", () => {
+  const deterministicMath = Object.create(Math);
+  deterministicMath.random = () => 0;
+  const analyser = createAnalyser({}, { Math: deterministicMath });
+  analyser.addObjBtn();
+  assert.equal(analyser.getObject(2).render_color, "#000000");
+});
